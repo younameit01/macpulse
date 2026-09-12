@@ -44,8 +44,14 @@ case "$1" in
     echo "[*] Building React frontend static bundle..."
     (cd "$DIR/frontend" && npm run build)
     ;;
+  install-agent)
+    "$DIR/scripts/install_launchd_agent.sh"
+    ;;
+  uninstall-agent)
+    "$DIR/scripts/uninstall_launchd_agent.sh"
+    ;;
   *)
-    echo "Usage: ./run.sh {setup|server|frontend|agent|test|demo-load|reset-demo|build}"
+    echo "Usage: ./run.sh {setup|server|frontend|agent|install-agent|uninstall-agent|test|demo-load|reset-demo|build}"
     exit 1
     ;;
 esac

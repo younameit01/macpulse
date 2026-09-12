@@ -52,3 +52,9 @@ reset-demo:
 build:
 	@echo "[*] Building React frontend static assets..."
 	@cd frontend && npm run build
+
+install-agent:
+	@./scripts/install_launchd_agent.sh
+
+uninstall-agent:
+	@./scripts/uninstall_launchd_agent.sh
