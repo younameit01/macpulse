@@ -48,6 +48,44 @@ export async function requestExplain(alertId) {
   return res.json();
 }
 
+export function subscribeOverviewStream(onData, onError) {
+  const url = `${API_BASE}/api/v1/stream/overview`;
+  let eventSource = null;
+  try {
+    eventSource = new EventSource(url);
+
+    eventSource.addEventListener('overview', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onData(data);
+      } catch (err) {
+        console.error('Error parsing SSE overview data:', err);
+      }
+    });
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onData(data);
+      } catch (err) {
+        // ignore ping
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      if (onError) onError(err);
+    };
+  } catch (err) {
+    if (onError) onError(err);
+  }
+
+  return () => {
+    if (eventSource) {
+      eventSource.close();
+    }
+  };
+}
+
 export function formatBytes(bytes, decimals = 1) {
   if (!bytes || bytes === 0) return '0 B';
   const k = 1024;

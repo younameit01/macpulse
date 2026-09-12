@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
-from backend.routes import agents, ingest, overview, hosts, volumes, alerts, health
+from backend.routes import agents, ingest, overview, hosts, volumes, alerts, health, stream
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,6 +38,7 @@ app.include_router(overview.router)
 app.include_router(hosts.router)
 app.include_router(volumes.router)
 app.include_router(alerts.router)
+app.include_router(stream.router)
 
 # If frontend is built, serve static files for single-process coordinator deployment
 frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"

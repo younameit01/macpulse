@@ -120,3 +120,12 @@ def test_metric_ingestion_and_capacity_alert(client):
     assert "likely_interpretation" in explain_data
     assert len(explain_data["recommended_checks"]) >= 1
     assert "risk" in explain_data
+
+def test_stream_overview(client):
+    with client.stream("GET", "/api/v1/stream/overview?limit=1") as response:
+        assert response.status_code == 200
+        assert "text/event-stream" in response.headers["content-type"]
+        text = response.read().decode("utf-8")
+        assert "event: overview" in text
+        assert "data: {" in text
+

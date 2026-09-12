@@ -6,7 +6,7 @@ import AlertsPanel from './components/AlertsPanel';
 import HostDetail from './components/HostDetail';
 import VolumeDetail from './components/VolumeDetail';
 import AlertDrawer from './components/AlertDrawer';
-import { fetchOverview } from './api';
+import { fetchOverview, subscribeOverviewStream } from './api';
 
 export default function App() {
   const [currentView, setView] = useState('overview'); // 'overview' | 'host' | 'volume' | 'alerts'
@@ -17,6 +17,7 @@ export default function App() {
   const [overview, setOverview] = useState(null);
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [isPolling, setIsPolling] = useState(false);
+  const [isSseActive, setIsSseActive] = useState(false);
 
   const loadOverview = async () => {
     try {
@@ -32,10 +33,34 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Initial fetch
     loadOverview();
-    const timer = setInterval(loadOverview, 3000);
-    return () => clearInterval(timer);
-  }, []);
+
+    // Connect to Server-Sent Events (SSE) stream
+    const unsubscribe = subscribeOverviewStream(
+      (data) => {
+        setOverview(data);
+        setLastRefresh(new Date());
+        setIsSseActive(true);
+      },
+      (err) => {
+        console.warn('SSE stream error, falling back to polling:', err);
+        setIsSseActive(false);
+      }
+    );
+
+    // Backup polling timer in case SSE is interrupted
+    const backupTimer = setInterval(() => {
+      if (!isSseActive) {
+        loadOverview();
+      }
+    }, 4000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(backupTimer);
+    };
+  }, [isSseActive]);
 
   const handleSelectHost = (hostId) => {
     setSelectedHostId(hostId);
@@ -65,6 +90,7 @@ export default function App() {
         }}
         lastRefresh={lastRefresh}
         isPolling={isPolling}
+        isSseActive={isSseActive}
         onManualRefresh={loadOverview}
       />
 

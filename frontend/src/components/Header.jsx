@@ -1,7 +1,7 @@
 import React from 'react';
 import { Activity, Server, Bell, HardDrive, RefreshCw } from 'lucide-react';
 
-export default function Header({ currentView, setView, lastRefresh, isPolling, onManualRefresh }) {
+export default function Header({ currentView, setView, lastRefresh, isPolling, isSseActive, onManualRefresh }) {
   const formattedTime = lastRefresh ? lastRefresh.toLocaleTimeString() : '--:--:--';
 
   return (
@@ -36,7 +36,7 @@ export default function Header({ currentView, setView, lastRefresh, isPolling, o
       <div className="header-meta">
         <div className="pulse-indicator">
           <span className="pulse-dot"></span>
-          <span>LIVE • {formattedTime}</span>
+          <span>{isSseActive ? 'SSE STREAMING' : 'POLLING'} • {formattedTime}</span>
         </div>
         <button
           onClick={onManualRefresh}
