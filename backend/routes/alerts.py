@@ -83,15 +83,18 @@ def get_alert(alert_id: str, db: Session = Depends(get_db)):
     )
 
 
+from starlette.concurrency import run_in_threadpool
+
 @router.post("/{alert_id}/explain", response_model=ExplainResponse)
-def explain_alert_endpoint(alert_id: str, db: Session = Depends(get_db)):
+async def explain_alert_endpoint(alert_id: str, db: Session = Depends(get_db)):
     a = db.query(Alert).filter(Alert.id == alert_id).first()
     if not a:
         raise HTTPException(status_code=404, detail="Alert not found")
 
     # Check for cached explanation (PRD Section 8.5)
     cached = db.query(Explanation).filter(Explanation.alert_id == alert_id).first()
-    if cached:
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if cached and (cached.status == "success" or not api_key):
         try:
             cached_data = json.loads(cached.response_text)
             return ExplainResponse(
@@ -107,19 +110,25 @@ def explain_alert_endpoint(alert_id: str, db: Session = Depends(get_db)):
         except Exception:
             pass
 
-    # Generate explanation
-    exp_dict = explain_alert(a)
+    # Generate explanation via threadpool so LLM call never blocks other endpoints
+    exp_dict = await run_in_threadpool(explain_alert, a)
 
-    # Persist in explanations table
-    new_exp = Explanation(
-        alert_id=alert_id,
-        created_at=utc_now(),
-        model=exp_dict.get("model", "unknown"),
-        prompt_version="v1",
-        response_text=json.dumps(exp_dict),
-        status=exp_dict.get("status", "success"),
-    )
-    db.add(new_exp)
+    # Persist or update in explanations table
+    if cached:
+        cached.created_at = utc_now()
+        cached.model = exp_dict.get("model", "unknown")
+        cached.response_text = json.dumps(exp_dict)
+        cached.status = exp_dict.get("status", "success")
+    else:
+        new_exp = Explanation(
+            alert_id=alert_id,
+            created_at=utc_now(),
+            model=exp_dict.get("model", "unknown"),
+            prompt_version="v1",
+            response_text=json.dumps(exp_dict),
+            status=exp_dict.get("status", "success"),
+        )
+        db.add(new_exp)
     db.commit()
 
     return ExplainResponse(

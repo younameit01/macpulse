@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 from typing import Dict, Any, Optional
@@ -166,16 +167,19 @@ def explain_alert(alert: Alert) -> Dict[str, Any]:
 
     sanitized = sanitize_payload(alert, evidence)
 
-    if not GEMINI_API_KEY:
+    api_key = os.getenv("GEMINI_API_KEY", GEMINI_API_KEY)
+    model_name = os.getenv("GEMINI_MODEL", GEMINI_MODEL) or "gemini-3.6-flash"
+
+    if not api_key:
         logger.info("No GEMINI_API_KEY set; using deterministic local explanation.")
         return generate_local_fallback(alert, sanitized)
 
     try:
         from google import genai
-        client = genai.Client(api_key=GEMINI_API_KEY)
+        client = genai.Client(api_key=api_key)
         prompt = build_prompt(sanitized)
         response = client.models.generate_content(
-            model=GEMINI_MODEL,
+            model=model_name,
             contents=prompt,
         )
         

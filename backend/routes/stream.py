@@ -8,12 +8,22 @@ from backend.routes.overview import get_overview
 
 router = APIRouter(prefix="/api/v1/stream", tags=["stream"])
 
+from starlette.concurrency import run_in_threadpool
+
 @router.get("/overview")
 async def stream_overview(request: Request, limit: int = None):
     """
     Server-Sent Events (SSE) endpoint streaming real-time fleet overview data
     to the React dashboard. Supports optional limit for testing.
     """
+    def fetch_payload():
+        db = SessionLocal()
+        try:
+            overview_data = get_overview(db)
+            return overview_data.model_dump_json()
+        finally:
+            db.close()
+
     async def event_generator():
         count = 0
         try:
@@ -22,13 +32,8 @@ async def stream_overview(request: Request, limit: int = None):
                 if await request.is_disconnected():
                     break
 
-                # Create scoped session to fetch latest overview state
-                db = SessionLocal()
-                try:
-                    overview_data = get_overview(db)
-                    payload = overview_data.model_dump_json()
-                finally:
-                    db.close()
+                # Offload synchronous DB query to threadpool
+                payload = await run_in_threadpool(fetch_payload)
 
                 # Yield SSE message format: event: <name>\ndata: <json>\n\n
                 yield f"event: overview\ndata: {payload}\n\n"
