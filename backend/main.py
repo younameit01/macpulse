@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
-from backend.routes import agents, ingest, overview, hosts, volumes, alerts, health, stream
+from backend.routes import agents, ingest, overview, hosts, volumes, alerts, health, stream, installer
 
 from backend.discovery import CoordinatorDiscoveryBeacon
 
@@ -36,6 +36,7 @@ app.add_middleware(
 )
 
 # Include API Routers
+app.include_router(installer.router)
 app.include_router(health.router)
 app.include_router(agents.router)
 app.include_router(ingest.router)
