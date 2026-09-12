@@ -87,10 +87,39 @@ In your second terminal (optional if static build is served):
 Dashboard available at `http://localhost:5173`.
 
 ### 5. Start Telemetry Agent
-In your third terminal (or on another Mac on the LAN pointing to `MACAI_COORDINATOR_URL`):
+On your primary Mac:
 ```bash
 ./run.sh agent
 # or: make agent
+```
+
+---
+
+## Remote Fleet Deployment (Zero-Git 1-Line Install)
+
+To monitor additional Mac laptops across your local network without cloning Git or installing Node.js/frontend dependencies:
+
+On any other Mac on the same Wi-Fi/LAN, simply run:
+```bash
+curl -fsSL http://<coordinator-ip>:8000/install | bash
+# Example: curl -fsSL http://10.161.3.95:8000/install | bash
+```
+
+**What this does automatically:**
+1. Downloads the lightweight agent bundle directly from the coordinator.
+2. Sets up an isolated Python runtime in `~/.macai/agent`.
+3. Registers Apple's native `launchd` background service (`~/Library/LaunchAgents/com.macai.storage.agent.plist`).
+4. **Auto-starts on boot / wake-from-sleep** and automatically discovers the coordinator on the LAN.
+
+*(If you already cloned the repository on the second Mac, you can run `./run.sh install-agent` instead).*
+
+To check background agent logs on any client Mac:
+```bash
+tail -f ~/.macai/agent/agent.log
+```
+To uninstall:
+```bash
+./run.sh uninstall-agent
 ```
 
 ---
