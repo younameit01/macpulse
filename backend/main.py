@@ -8,11 +8,16 @@ from fastapi.staticfiles import StaticFiles
 from backend.database import init_db
 from backend.routes import agents, ingest, overview, hosts, volumes, alerts, health, stream
 
+from backend.discovery import CoordinatorDiscoveryBeacon
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database tables on startup
     init_db()
+    beacon = CoordinatorDiscoveryBeacon(port=8000)
+    beacon.start()
     yield
+    beacon.stop()
 
 app = FastAPI(
     title="MacAI Storage Observatory API",

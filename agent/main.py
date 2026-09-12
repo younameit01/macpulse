@@ -34,6 +34,8 @@ def handle_exit(signum, frame):
 signal.signal(signal.SIGINT, handle_exit)
 signal.signal(signal.SIGTERM, handle_exit)
 
+from agent.discovery import discover_coordinator_url
+
 def run_agent():
     metadata = get_host_metadata()
     if MACAI_AGENT_NAME:
@@ -41,10 +43,13 @@ def run_agent():
 
     host_id = metadata["host_id"]
     logger.info(f"Starting MacAI Storage Agent for {metadata['hostname']} (ID: {host_id})")
-    logger.info(f"Target coordinator: {MACAI_COORDINATOR_URL}")
+
+    # Automatically discover coordinator on local machine or LAN
+    coordinator_url = discover_coordinator_url(MACAI_COORDINATOR_URL)
+    logger.info(f"Connected coordinator: {coordinator_url}")
     logger.info(f"Sampling interval: {MACAI_SAMPLE_INTERVAL_SECONDS}s | Elevated mode: {MACAI_ENABLE_ELEVATED_COLLECTOR}")
 
-    client = CoordinatorClient(MACAI_COORDINATOR_URL)
+    client = CoordinatorClient(coordinator_url)
     io_sampler = IOSampler()
 
     # Initial registration attempt
