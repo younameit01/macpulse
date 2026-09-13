@@ -92,6 +92,26 @@ export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAl
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {host.storage_total_bytes > 0 && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  background: 'var(--bg-subtle)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  fontSize: 11,
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <HardDrive size={13} color="var(--chart-read)" />
+                <span>
+                  Storage: <strong style={{ color: 'var(--text-main)' }}>{formatBytes(host.storage_used_bytes)}</strong> / {formatBytes(host.storage_total_bytes)} ({host.storage_used_pct}%)
+                </span>
+              </span>
+            )}
             <span className={`badge ${host.status === 'online' ? 'badge-online' : 'badge-offline'}`} style={{ padding: '4px 10px', fontSize: 11 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: host.status === 'online' ? '#10b981' : '#ef4444' }}></span>
               {host.status}
@@ -213,10 +233,14 @@ export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAl
                         {v.source}
                       </span>
                     </td>
-                    <td style={{ minWidth: 180 }}>
+                    <td style={{ minWidth: 210 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                        <span>{formatBytes(v.used_bytes)} / {formatBytes(v.total_bytes)}</span>
-                        <strong>{v.used_pct}%</strong>
+                        <span>
+                          <strong style={{ color: 'var(--text-main)' }}>{formatBytes(v.used_bytes)}</strong> / {formatBytes(v.total_bytes)}
+                        </span>
+                        <strong style={{ color: v.used_pct >= 90 ? 'var(--alert-crit-border)' : v.used_pct >= 80 ? 'var(--alert-warn-text)' : 'var(--text-main)' }}>
+                          {v.used_pct}% ({formatBytes(v.free_bytes)} free)
+                        </strong>
                       </div>
                       <div style={{ width: '100%', height: 6, background: 'var(--bg-subtle)', borderRadius: 3, overflow: 'hidden' }}>
                         <div
@@ -228,6 +252,11 @@ export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAl
                           }}
                         />
                       </div>
+                      {v.breakdown && (
+                        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, lineHeight: 1.4 }}>
+                          Includes {formatBytes(v.breakdown.data_bytes)} Data · {formatBytes(v.breakdown.system_bytes)} System{v.breakdown.other_volumes_bytes > 0 ? ` · ${formatBytes(v.breakdown.other_volumes_bytes)} VM & System` : ''}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <div style={{ fontSize: 12 }}>

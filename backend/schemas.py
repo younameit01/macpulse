@@ -26,6 +26,7 @@ class VolumeDiscoveryItem(BaseModel):
     total_bytes: int
     used_bytes: int = 0
     free_bytes: int = 0
+    breakdown: Optional[Dict[str, int]] = None
 
 class MetricSampleItem(BaseModel):
     volume_mount: Optional[str] = None
@@ -70,6 +71,7 @@ class VolumeSummary(BaseModel):
     used_pct: float
     current_read_bps: float = 0.0
     current_write_bps: float = 0.0
+    breakdown: Optional[Dict[str, int]] = None
 
 class HostSummary(BaseModel):
     id: str
@@ -87,6 +89,9 @@ class HostSummary(BaseModel):
     latest_alert: Optional[str] = None
     disk_health: Optional[Dict[str, Any]] = None
     system_resources: Optional[Dict[str, Any]] = None
+    storage_total_bytes: Optional[int] = 0
+    storage_used_bytes: Optional[int] = 0
+    storage_used_pct: Optional[float] = 0.0
 
 class AlertHistoryEvent(BaseModel):
     event: str
@@ -185,6 +190,7 @@ class ActiveVolumeItem(BaseModel):
     used_pct: float = 0.0
     is_warning: bool = False
     warning_label: Optional[str] = None
+    breakdown: Optional[Dict[str, int]] = None
 
 class OverviewResponse(BaseModel):
     hosts_online: int
@@ -222,6 +228,9 @@ class HostDetailResponse(BaseModel):
     recent_events: List[Dict[str, Any]]
     disk_health: Optional[Dict[str, Any]] = None
     system_resources: Optional[Dict[str, Any]] = None
+    storage_total_bytes: Optional[int] = 0
+    storage_used_bytes: Optional[int] = 0
+    storage_used_pct: Optional[float] = 0.0
 
 class VolumeDetailResponse(BaseModel):
     id: str
@@ -236,6 +245,7 @@ class VolumeDetailResponse(BaseModel):
     used_pct: float
     current_read_bps: float
     current_write_bps: float
+    breakdown: Optional[Dict[str, int]] = None
     nfs_stats: Optional[Dict[str, Any]] = None
     alerts: List[AlertSummary] = []
 

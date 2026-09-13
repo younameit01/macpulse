@@ -104,10 +104,10 @@ export default function CreateAdminView({ onBack }) {
     try {
       if (typeof window !== 'undefined' && window.location.origin) {
         const url = new URL(createdAdmin.setup_link);
-        // If the setup link contains localhost, 127.0.0.1, or port 3000, adapt to current origin
-        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.port === '3000') {
-          return `${window.location.origin}${url.pathname}${url.search}`;
-        }
+        // Harmonize with current browser origin:
+        // - When accessed locally (e.g. localhost:3000): uses http://localhost:3000/?invite=...
+        // - When accessed on the domain (e.g. macpulse.tech): uses https://macpulse.tech/?invite=...
+        return `${window.location.origin}${url.pathname}${url.search}`;
       }
     } catch {
       // Ignore URL parsing errors and fallback

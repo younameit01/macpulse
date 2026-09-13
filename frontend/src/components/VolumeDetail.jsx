@@ -135,6 +135,34 @@ export default function VolumeDetail({ volumeId, onBack, onExplainAlert }) {
               }}
             />
           </div>
+
+          {vol.breakdown && (
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 8, letterSpacing: '0.05em' }}>
+                APFS Container Storage Allocation
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ padding: '6px 12px', background: 'var(--bg-subtle)', borderRadius: 6, border: '1px solid rgba(255, 255, 255, 0.05)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-dim)' }}>User Data: </span>
+                  <strong style={{ color: 'var(--text-main)' }}>{formatBytes(vol.breakdown.data_bytes)}</strong>
+                </div>
+                <div style={{ padding: '6px 12px', background: 'var(--bg-subtle)', borderRadius: 6, border: '1px solid rgba(255, 255, 255, 0.05)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-dim)' }}>macOS System: </span>
+                  <strong style={{ color: 'var(--text-main)' }}>{formatBytes(vol.breakdown.system_bytes)}</strong>
+                </div>
+                {(vol.breakdown.other_volumes_bytes > 0 || vol.breakdown.vm_bytes > 0) && (
+                  <div style={{ padding: '6px 12px', background: 'var(--bg-subtle)', borderRadius: 6, border: '1px solid rgba(255, 255, 255, 0.05)', fontSize: 12 }}>
+                    <span style={{ color: 'var(--text-dim)' }}>VM & System Volumes: </span>
+                    <strong style={{ color: 'var(--text-main)' }}>{formatBytes(vol.breakdown.other_volumes_bytes || vol.breakdown.vm_bytes)}</strong>
+                  </div>
+                )}
+                <div style={{ padding: '6px 12px', background: 'var(--bg-subtle)', borderRadius: 6, border: '1px solid rgba(255, 255, 255, 0.05)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-dim)' }}>Unallocated Free: </span>
+                  <strong style={{ color: 'var(--alert-green-text)' }}>{formatBytes(vol.free_bytes)}</strong>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

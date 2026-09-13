@@ -1,6 +1,6 @@
 import React from 'react';
 import { Server, ChevronRight, AlertCircle, HardDrive } from 'lucide-react';
-import { formatBps } from '../api';
+import { formatBps, formatBytes } from '../api';
 
 const formatVolumeName = (vol) => {
   if (!vol || vol === '/' || vol.includes('Data')) return 'Macintosh HD';
@@ -25,6 +25,7 @@ export default function HostTable({ hosts = [], onSelectHost }) {
             <tr>
               <th>Host</th>
               <th>Status</th>
+              <th>Storage</th>
               <th>Mounts</th>
               <th>Hottest Volume</th>
               <th>Current Write</th>
@@ -36,7 +37,7 @@ export default function HostTable({ hosts = [], onSelectHost }) {
           <tbody>
             {hosts.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: 32 }}>
+                <td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: 32 }}>
                   Waiting for Mac agents to report telemetry... Run <code>make agent</code> in a terminal.
                 </td>
               </tr>
@@ -59,6 +60,55 @@ export default function HostTable({ hosts = [], onSelectHost }) {
                       <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: h.status === 'online' ? '#10b981' : '#ef4444' }}></span>
                       {h.status}
                     </span>
+                  </td>
+                  <td style={{ minWidth: 160 }}>
+                    {h.storage_total_bytes > 0 ? (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 12, marginBottom: 4 }}>
+                          <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>
+                            {formatBytes(h.storage_used_bytes)}
+                          </span>
+                          <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>
+                            / {formatBytes(h.storage_total_bytes)}
+                          </span>
+                          <span style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: '1px 5px',
+                            borderRadius: 4,
+                            marginLeft: 4,
+                            backgroundColor: (h.storage_used_pct || 0) >= 90
+                              ? 'rgba(239, 68, 68, 0.15)'
+                              : (h.storage_used_pct || 0) >= 80
+                                ? 'rgba(245, 158, 11, 0.15)'
+                                : 'rgba(16, 185, 129, 0.15)',
+                            color: (h.storage_used_pct || 0) >= 90
+                              ? 'var(--alert-crit-border)'
+                              : (h.storage_used_pct || 0) >= 80
+                                ? 'var(--alert-warn-text)'
+                                : 'var(--alert-green-text)',
+                          }}>
+                            {h.storage_used_pct || 0}%
+                          </span>
+                        </div>
+                        <div style={{ width: '100%', height: 5, background: 'var(--bg-subtle)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              width: `${Math.min(100, h.storage_used_pct || 0)}%`,
+                              height: '100%',
+                              backgroundColor: (h.storage_used_pct || 0) >= 90
+                                ? 'var(--alert-crit-border)'
+                                : (h.storage_used_pct || 0) >= 80
+                                  ? 'var(--alert-warn-border)'
+                                  : 'var(--chart-read)',
+                              borderRadius: 3,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
+                    )}
                   </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)' }}>

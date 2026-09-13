@@ -139,6 +139,37 @@ def get_overview(db: Session = Depends(get_db)):
             and not ((cv.fs_type or "").lower() == "hfs" and cv.mount_path.startswith("/Volumes/"))
         )
 
+        # Calculate accurate host-level storage used and total
+        h_storage_total = 0
+        h_storage_used = 0
+        for cv in h.volumes:
+            if cv.mount_path == "/" and has_data_v:
+                continue
+            fs_lower = (cv.fs_type or "").lower()
+            if fs_lower in ("nullfs", "devfs", "autofs", "procfs"):
+                continue
+            if "/AppTranslocation/" in cv.mount_path or cv.mount_path.startswith("/private/var/folders/"):
+                continue
+            if cv.mount_path.startswith("/Volumes/Recovery"):
+                continue
+            if fs_lower == "hfs" and cv.mount_path.startswith("/Volumes/"):
+                continue
+
+            l_sample = db.query(MetricSample).filter(
+                MetricSample.volume_id == cv.id
+            ).order_by(desc(MetricSample.timestamp)).first()
+
+            v_used = l_sample.used_bytes if l_sample else 0
+            v_free = l_sample.free_bytes if l_sample else 0
+            v_tot = cv.total_bytes or 0
+            if "apfs" in fs_lower and v_tot > v_free and (v_tot - v_free) > v_used:
+                v_used = v_tot - v_free
+
+            h_storage_total += v_tot
+            h_storage_used += v_used
+
+        h_storage_pct = round((h_storage_used / h_storage_total * 100.0), 1) if h_storage_total > 0 else 0.0
+
         host_summaries.append(
             HostSummary(
                 id=h.id,
@@ -156,6 +187,9 @@ def get_overview(db: Session = Depends(get_db)):
                 latest_alert=latest_alert.type if latest_alert else None,
                 disk_health=h_disk_health,
                 system_resources=h_system_resources,
+                storage_total_bytes=h_storage_total,
+                storage_used_bytes=h_storage_used,
+                storage_used_pct=h_storage_pct,
             )
         )
 
@@ -229,7 +263,35 @@ def get_overview(db: Session = Depends(get_db)):
         ).order_by(desc(MetricSample.timestamp)).first()
 
         used = latest_sample.used_bytes if latest_sample else 0
+        free = latest_sample.free_bytes if latest_sample else 0
         total = v.total_bytes or 0
+        breakdown = None
+
+        if "apfs" in fs:
+            root_vol = next((sv for sv in all_volumes if sv.host_id == v.host_id and sv.mount_path == "/" and sv.id != v.id), None)
+            root_sample = db.query(MetricSample).filter(
+                MetricSample.volume_id == root_vol.id
+            ).order_by(desc(MetricSample.timestamp)).first() if root_vol else None
+
+            system_used = root_sample.used_bytes if root_sample else 0
+            data_used = used
+
+            if total > free and (total - free) > used:
+                total_used = total - free
+                other_used = max(0, total_used - data_used - system_used)
+                used = total_used
+                breakdown = {
+                    "data_bytes": data_used,
+                    "system_bytes": system_used,
+                    "other_volumes_bytes": other_used,
+                }
+            else:
+                breakdown = {
+                    "data_bytes": data_used,
+                    "system_bytes": system_used,
+                    "other_volumes_bytes": max(0, used - data_used - system_used),
+                }
+
         pct = round((used / total * 100.0), 1) if total > 0 else 0.0
 
         # Avoid double-counting APFS container total between / and /System/Volumes/Data:
@@ -261,6 +323,7 @@ def get_overview(db: Session = Depends(get_db)):
                 used_pct=pct,
                 is_warning=is_warn,
                 warning_label="Warning" if is_warn else None,
+                breakdown=breakdown,
             )
         )
 

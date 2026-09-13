@@ -13,7 +13,7 @@ def get_install_script(request: Request):
     Usage on any Mac: curl -fsSL http://<coordinator-ip>:8000/install | bash
     """
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "http"
-    host_header = request.headers.get("host", "localhost:8000")
+    host_header = request.headers.get("x-forwarded-host") or request.headers.get("host", "localhost:8000")
     coordinator_url = f"{proto}://{host_header}"
 
     script = f"""#!/usr/bin/env bash

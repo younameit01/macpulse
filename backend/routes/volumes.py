@@ -37,6 +37,37 @@ def get_volume_detail(volume_id: str, db: Session = Depends(get_db)):
     used = latest_sample.used_bytes if latest_sample else 0
     free = latest_sample.free_bytes if latest_sample else 0
     total = vol.total_bytes if vol.total_bytes > 0 else (used + free)
+    breakdown = None
+
+    if "apfs" in (vol.fs_type or "").lower():
+        root_vol = db.query(Volume).filter(
+            Volume.host_id == vol.host_id,
+            Volume.mount_path == "/",
+            Volume.id != vol.id
+        ).first()
+        root_sample = db.query(MetricSample).filter(
+            MetricSample.volume_id == root_vol.id
+        ).order_by(desc(MetricSample.timestamp)).first() if root_vol else None
+
+        system_used = root_sample.used_bytes if root_sample else 0
+        data_used = used
+
+        if total > free and (total - free) > used:
+            total_used = total - free
+            other_used = max(0, total_used - data_used - system_used)
+            used = total_used
+            breakdown = {
+                "data_bytes": data_used,
+                "system_bytes": system_used,
+                "other_volumes_bytes": other_used,
+            }
+        else:
+            breakdown = {
+                "data_bytes": data_used,
+                "system_bytes": system_used,
+                "other_volumes_bytes": max(0, used - data_used - system_used),
+            }
+
     used_pct = round((used / total * 100.0), 1) if total > 0 else 0.0
 
     nfs_stats = None
@@ -62,6 +93,7 @@ def get_volume_detail(volume_id: str, db: Session = Depends(get_db)):
         used_bytes=used,
         free_bytes=free,
         used_pct=used_pct,
+        breakdown=breakdown,
         current_read_bps=latest_sample.read_bps if latest_sample else 0.0,
         current_write_bps=latest_sample.write_bps if latest_sample else 0.0,
         nfs_stats=nfs_stats,

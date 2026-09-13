@@ -310,4 +310,91 @@ def test_smart_health_alerts(client):
     assert "nvme_critical_warning" in alert_types
 
 
+def test_apfs_multi_volume_storage_accounting(client):
+    host_id = "test-mac-apfs-multi"
+    client.post("/api/v1/agents/register", json={
+        "host_id": host_id,
+        "hostname": "mac-apfs-accounting",
+        "os_version": "macOS 15.2",
+    })
+
+    total_pool = 245107195904  # 245.1 GB
+    free_pool = 10771795968    # 10.8 GB free
+    system_used = 13659590656  # 13.7 GB
+    data_used = 196022030336   # 196.0 GB
+
+    ingest_payload = {
+        "host_id": host_id,
+        "volumes": [
+            {
+                "source": "/dev/disk3s1s1",
+                "mount_path": "/",
+                "fs_type": "apfs",
+                "total_bytes": total_pool,
+                "used_bytes": system_used,
+                "free_bytes": free_pool,
+            },
+            {
+                "source": "/dev/disk3s5",
+                "mount_path": "/System/Volumes/Data",
+                "fs_type": "apfs",
+                "total_bytes": total_pool,
+                "used_bytes": data_used,
+                "free_bytes": free_pool,
+            }
+        ],
+        "samples": [
+            {
+                "volume_mount": "/",
+                "used_bytes": system_used,
+                "free_bytes": free_pool,
+                "read_bps": 1000.0,
+                "write_bps": 1000.0,
+            },
+            {
+                "volume_mount": "/System/Volumes/Data",
+                "used_bytes": data_used,
+                "free_bytes": free_pool,
+                "read_bps": 5000.0,
+                "write_bps": 5000.0,
+            }
+        ]
+    }
+
+    resp = client.post("/api/v1/ingest/metrics", json=ingest_payload)
+    assert resp.status_code == 200
+
+    # 1. Verify /api/v1/hosts returns host-level total/used storage matching container pool
+    hosts_resp = client.get("/api/v1/hosts").json()
+    target_host = next((h for h in hosts_resp if h["id"] == host_id), None)
+    assert target_host is not None
+    assert target_host["storage_total_bytes"] == total_pool
+    # Used must account for all internal volumes (Data + System + other container space)
+    expected_used = total_pool - free_pool
+    assert target_host["storage_used_bytes"] == expected_used
+    assert target_host["storage_used_pct"] == round((expected_used / total_pool * 100.0), 1)
+
+    # 2. Verify /api/v1/hosts/{host_id} shows one volume with exact used + free == total and breakdown
+    detail = client.get(f"/api/v1/hosts/{host_id}").json()
+    assert len(detail["volumes"]) == 1  # root / is consolidated into single primary volume
+    v = detail["volumes"][0]
+    assert v["mount_path"] == "/System/Volumes/Data"
+    assert v["used_bytes"] + v["free_bytes"] == v["total_bytes"]
+    assert v["used_bytes"] == expected_used
+    assert v["free_bytes"] == free_pool
+    assert v["total_bytes"] == total_pool
+
+    # Verify breakdown
+    assert v["breakdown"] is not None
+    assert v["breakdown"]["data_bytes"] == data_used
+    assert v["breakdown"]["system_bytes"] == system_used
+    assert v["breakdown"]["data_bytes"] + v["breakdown"]["system_bytes"] + v["breakdown"]["other_volumes_bytes"] == expected_used
+
+    # 3. Verify /api/v1/volumes/detail
+    v_detail = client.get(f"/api/v1/volumes/detail?volume_id={host_id}:/System/Volumes/Data").json()
+    assert v_detail["used_bytes"] + v_detail["free_bytes"] == v_detail["total_bytes"]
+    assert v_detail["breakdown"] is not None
+
+
+
 

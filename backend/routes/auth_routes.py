@@ -41,7 +41,43 @@ AUTH0_MGMT_CLIENT_ID = os.getenv("AUTH0_MANAGEMENT_CLIENT_ID", "").strip()
 AUTH0_MGMT_CLIENT_SECRET = os.getenv("AUTH0_MANAGEMENT_CLIENT_SECRET", "").strip()
 
 
-async def _create_auth0_user(name: str, email: str) -> tuple[Optional[str], Optional[str]]:
+def get_frontend_base_url(request: Request) -> str:
+    """
+    Returns the frontend origin:
+    - If running locally (localhost / 127.0.0.1), automatically uses http://localhost:3000
+    - If on domain (macpulse.tech or custom production domain), automatically uses https://<domain>
+    """
+    origin = request.headers.get("origin")
+    if origin:
+        origin_clean = origin.rstrip("/")
+        if "localhost" in origin_clean or "127.0.0.1" in origin_clean:
+            return "http://localhost:3000"
+        return origin_clean
+
+    referer = request.headers.get("referer")
+    if referer:
+        try:
+            from urllib.parse import urlparse
+            p = urlparse(referer)
+            if p.scheme and p.netloc:
+                if "localhost" in p.netloc or "127.0.0.1" in p.netloc:
+                    return "http://localhost:3000"
+                return f"{p.scheme}://{p.netloc}"
+        except Exception:
+            pass
+
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    if "localhost" in host or "127.0.0.1" in host:
+        return "http://localhost:3000"
+
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
+    if host:
+        return f"{proto}://{host}"
+
+    return os.getenv("FRONTEND_URL", "https://macpulse.tech").rstrip("/")
+
+
+async def _create_auth0_user(name: str, email: str, base_url: str = "https://macpulse.tech") -> tuple[Optional[str], Optional[str]]:
     """
     Calls Auth0 Management API to create user, assign Admin role,
     and generate password change / invitation ticket.
@@ -50,8 +86,7 @@ async def _create_auth0_user(name: str, email: str) -> tuple[Optional[str], Opti
     if not (AUTH0_DOMAIN and AUTH0_MGMT_CLIENT_ID and AUTH0_MGMT_CLIENT_SECRET):
         # Local / dev fallback: return simulated Auth0 ID and secure setup ticket
         ticket = secrets.token_urlsafe(32)
-        domain = AUTH0_DOMAIN or "auth.macai.observatory"
-        setup_url = f"https://{domain}/u/signup?invitation_ticket={ticket}&email={email}"
+        setup_url = f"{base_url}/?invite={ticket}&email={email}"
         return f"auth0|mock_{uuid.uuid4().hex[:12]}", setup_url
 
     try:
@@ -108,7 +143,7 @@ async def _create_auth0_user(name: str, email: str) -> tuple[Optional[str], Opti
                 headers=headers,
                 json={
                     "user_id": user_id,
-                    "result_url": f"https://{AUTH0_DOMAIN}/login",
+                    "result_url": f"{base_url}/login",
                     "ttl_sec": 86400 * 7,  # 7 days
                 },
             )
@@ -174,9 +209,8 @@ async def create_admin(
 
     # Generate a secure, unique one-time invitation token
     invite_token = secrets.token_urlsafe(32)
-    proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
-    host_header = request.headers.get("host") or "macpulse.tech"
-    setup_url = f"{proto}://{host_header}/?invite={invite_token}"
+    base_url = get_frontend_base_url(request)
+    setup_url = f"{base_url}/?invite={invite_token}"
 
     new_admin = AdminUser(
         id=str(uuid.uuid4()),
