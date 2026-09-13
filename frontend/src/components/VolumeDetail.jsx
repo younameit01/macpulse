@@ -1,8 +1,65 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, HardDrive, Network } from 'lucide-react';
+import { ArrowLeft, HardDrive, Network, Info } from 'lucide-react';
 import { fetchVolumeDetail, fetchVolumeMetrics, formatBytes, formatBps } from '../api';
 import IoChart from './IoChart';
 import AlertsPanel from './AlertsPanel';
+
+function InfoTooltip({ title, content, align = 'left' }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div
+      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: '0 2px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          color: open ? 'var(--chart-read)' : 'var(--text-dim)',
+          transition: 'color 0.15s ease',
+        }}
+        aria-label={title}
+      >
+        <Info size={13} />
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 'calc(100% + 6px)',
+            ...(align === 'right' ? { right: 0 } : { left: 0 }),
+            width: 240,
+            maxWidth: 'calc(100vw - 40px)',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-hover)',
+            boxShadow: '0 10px 28px rgba(0, 0, 0, 0.35)',
+            borderRadius: 8,
+            padding: '10px 12px',
+            zIndex: 100,
+            pointerEvents: 'none',
+            textAlign: 'left',
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-main)', marginBottom: 4 }}>
+            {title}
+          </div>
+          <div style={{ fontSize: 11, lineHeight: 1.45, color: 'var(--text-muted)' }}>
+            {content}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function VolumeDetail({ volumeId, onBack, onExplainAlert }) {
   const [vol, setVol] = useState(null);
@@ -175,19 +232,67 @@ export default function VolumeDetail({ volumeId, onBack, onExplainAlert }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
             <div style={{ padding: 14, background: 'var(--bg-subtle)', borderRadius: 10 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Server Export</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Server Export</span>
+                <InfoTooltip
+                  title="Server Export"
+                  content="The remote NFS / Parallel NFS (pNFS) storage server IP and exported filesystem directory mounted by this Mac."
+                />
+              </div>
               <div className="mono-text" style={{ fontSize: 14, color: 'var(--text-main)', marginTop: 4 }}>{vol.source}</div>
             </div>
+
             <div style={{ padding: 14, background: 'var(--bg-subtle)', borderRadius: 10 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase' }}>RPC Requests / Sec</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase' }}>RPC Requests / Sec</span>
+                <InfoTooltip
+                  title="RPC Requests / Sec"
+                  content="Rate of Remote Procedure Call (RPC) file read/write operations per second. Higher rates reflect active dataset streaming or model checkpointing."
+                />
+              </div>
               <div className="mono-text" style={{ fontSize: 18, fontWeight: 700, color: 'var(--chart-read)', marginTop: 4 }}>
                 {vol.nfs_stats?.nfs_ops_per_sec ?? 'N/A'}
               </div>
             </div>
+
             <div style={{ padding: 14, background: 'var(--bg-subtle)', borderRadius: 10 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase' }}>RPC Retransmissions</div>
-              <div className="mono-text" style={{ fontSize: 18, fontWeight: 700, color: (vol.nfs_stats?.nfs_retrans || 0) > 0 ? 'var(--alert-warn-text)' : 'var(--alert-green-text)', marginTop: 4 }}>
-                {vol.nfs_stats?.nfs_retrans ?? 0}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase' }}>RPC Retransmissions</span>
+                <InfoTooltip
+                  title="RPC Retransmissions"
+                  content="Number of unacknowledged RPC packets that the client had to re-send. 0 means healthy connection. Values > 0 indicate network packet loss, latency spikes, or storage node congestion."
+                  align="right"
+                />
+              </div>
+              <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span className="mono-text" style={{ fontSize: 18, fontWeight: 700, color: (vol.nfs_stats?.nfs_retrans || 0) > 0 ? 'var(--alert-crit-text)' : 'var(--alert-green-text)' }}>
+                    {vol.nfs_stats?.nfs_retrans ?? 0}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>current</span>
+                  {(vol.nfs_stats?.peak_retrans || 0) > 0 && (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                        color: 'var(--alert-warn-text)',
+                        border: '1px solid rgba(239, 68, 68, 0.25)',
+                        marginLeft: 'auto',
+                      }}
+                    >
+                      Peak: {vol.nfs_stats.peak_retrans}
+                    </span>
+                  )}
+                </div>
+                {(vol.nfs_stats?.nfs_retrans || 0) === 0 && (vol.nfs_stats?.peak_retrans || 0) > 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--alert-green-text)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>✓</span>
+                    <span>Healthy (Incident recovered)</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

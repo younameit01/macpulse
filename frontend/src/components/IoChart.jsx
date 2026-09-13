@@ -281,6 +281,15 @@ export default function IoChart({
               {formatBps(currentWrite)}
             </span>
           </div>
+          {activePoint?.nfs_retrans !== undefined && activePoint?.nfs_retrans !== null && (
+            <div className="legend-item">
+              <span className="legend-dot" style={{ backgroundColor: activePoint.nfs_retrans > 0 ? 'var(--alert-warn-text)' : 'var(--alert-green-text)' }}></span>
+              <span>Retrans</span>
+              <span className="mono-text" style={{ minWidth: 28, fontVariantNumeric: 'tabular-nums', color: activePoint.nfs_retrans > 0 ? 'var(--alert-warn-text)' : 'var(--text-dim)' }}>
+                {activePoint.nfs_retrans}
+              </span>
+            </div>
+          )}
         </div>
 
         <span

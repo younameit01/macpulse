@@ -215,6 +215,8 @@ class MetricPoint(BaseModel):
     write_bps: float
     used_bytes: int
     free_bytes: int
+    nfs_ops_per_sec: Optional[float] = None
+    nfs_retrans: Optional[int] = None
 
 class HostDetailResponse(BaseModel):
     id: str

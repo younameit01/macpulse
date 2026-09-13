@@ -1,7 +1,7 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from datetime import timedelta
 from typing import List
 
@@ -72,9 +72,14 @@ def get_volume_detail(volume_id: str, db: Session = Depends(get_db)):
 
     nfs_stats = None
     if vol.fs_type.lower() == "nfs" and latest_sample:
+        max_retrans = db.query(func.max(MetricSample.nfs_retrans)).filter(
+            MetricSample.volume_id == vol.id,
+        ).scalar() or 0
+
         nfs_stats = {
             "nfs_ops_per_sec": latest_sample.nfs_ops_per_sec,
             "nfs_retrans": latest_sample.nfs_retrans,
+            "peak_retrans": int(max_retrans),
             "server_export": vol.source,
         }
 
@@ -131,6 +136,8 @@ def get_volume_metrics(
             write_bps=s.write_bps,
             used_bytes=s.used_bytes,
             free_bytes=s.free_bytes,
+            nfs_ops_per_sec=s.nfs_ops_per_sec,
+            nfs_retrans=s.nfs_retrans,
         )
         for s in samples
     ]
