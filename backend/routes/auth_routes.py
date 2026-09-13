@@ -180,6 +180,7 @@ def get_current_user_profile(
 
 
 @router.post("/admins", response_model=CreateAdminResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/auth/create-admin", response_model=CreateAdminResponse, status_code=status.HTTP_201_CREATED)
 async def create_admin(
     req: CreateAdminRequest,
     request: Request,

@@ -6,42 +6,13 @@ from typing import List, Dict, Any, Optional
 
 def collect_active_processes(elevated: bool = False) -> List[Dict[str, Any]]:
     """
-    Collect processes engaged in filesystem/IO activity.
-    If elevated is True and sudo/fs_usage is available, sample recent filesystem writes.
-    Otherwise, inspect running processes via psutil with macOS fallback (memory RSS, CPU %, open files).
+    Collect processes engaged in filesystem/IO and compute activity
+    using lightweight, non-intrusive psutil process inspection.
     """
     events: List[Dict[str, Any]] = []
     now = datetime.now(timezone.utc)
 
-    # 1. If elevated mode is enabled, attempt short fs_usage sample (macOS root)
-    if elevated and os.geteuid() == 0:
-        try:
-            cmd = ["fs_usage", "-w", "-t", "1", "-f", "filesys"]
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-            stdout, _ = proc.communicate(timeout=2)
-            
-            for line in stdout.splitlines():
-                if "WrData" in line or "Write" in line:
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        p_name = parts[-1]
-                        events.append({
-                            "process": p_name,
-                            "pid": None,
-                            "user": "root/elevated",
-                            "operation": "write",
-                            "bytes": None,
-                            "volume_mount": None,
-                            "timestamp": now.isoformat(),
-                        })
-                        if len(events) >= 5:
-                            break
-            if events:
-                return events
-        except Exception:
-            pass
-
-    # 2. Standard mode: inspect running processes via psutil
+    # Standard userland mode: inspect running processes via psutil
     try:
         candidates = []
         for p in psutil.process_iter(['pid', 'name', 'username']):

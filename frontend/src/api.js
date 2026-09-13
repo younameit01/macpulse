@@ -193,35 +193,55 @@ export async function resolveAlert(alertId, resolutionNote = '') {
 export function subscribeOverviewStream(onData, onError) {
   const url = `${API_BASE}/api/v1/stream/overview`;
   let eventSource = null;
-  try {
-    eventSource = new EventSource(url);
+  let retryTimer = null;
+  let isClosed = false;
 
-    eventSource.addEventListener('overview', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        onData(data);
-      } catch (err) {
-        console.error('Error parsing SSE overview data:', err);
-      }
-    });
+  function connect() {
+    if (isClosed) return;
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        onData(data);
-      } catch (_err) {
-        // ignore ping
-      }
-    };
+    try {
+      eventSource = new EventSource(url);
 
-    eventSource.onerror = (err) => {
+      eventSource.addEventListener('overview', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          onData(data);
+        } catch (err) {
+          console.error('Error parsing SSE overview data:', err);
+        }
+      });
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          onData(data);
+        } catch (_err) {
+          // ignore ping
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        if (onError) onError(err);
+        // Automatically reconnect if EventSource permanently closed
+        if (eventSource && eventSource.readyState === EventSource.CLOSED && !isClosed) {
+          eventSource.close();
+          eventSource = null;
+          retryTimer = setTimeout(connect, 3000);
+        }
+      };
+    } catch (err) {
       if (onError) onError(err);
-    };
-  } catch (err) {
-    if (onError) onError(err);
+      if (!isClosed) {
+        retryTimer = setTimeout(connect, 3000);
+      }
+    }
   }
 
+  connect();
+
   return () => {
+    isClosed = true;
+    if (retryTimer) clearTimeout(retryTimer);
     if (eventSource) {
       eventSource.close();
     }

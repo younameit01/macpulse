@@ -396,5 +396,17 @@ def test_apfs_multi_volume_storage_accounting(client):
     assert v_detail["breakdown"] is not None
 
 
+def test_installer_and_uninstaller_endpoints(client):
+    # Test 1-line install script endpoint
+    resp_install = client.get("/install")
+    assert resp_install.status_code == 200
+    assert "#!/usr/bin/env bash" in resp_install.text
+    assert "com.macai.storage.agent" in resp_install.text
+    assert "launchctl load" in resp_install.text
 
-
+    # Test 1-line uninstall script endpoint
+    resp_uninstall = client.get("/uninstall")
+    assert resp_uninstall.status_code == 200
+    assert "#!/usr/bin/env bash" in resp_uninstall.text
+    assert "launchctl unload" in resp_uninstall.text
+    assert "rm -rf" in resp_uninstall.text

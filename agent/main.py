@@ -6,9 +6,7 @@ from datetime import datetime, timezone
 
 from agent.config import (
     MACAI_COORDINATOR_URL,
-    MACAI_AGENT_NAME,
     MACAI_SAMPLE_INTERVAL_SECONDS,
-    MACAI_ENABLE_ELEVATED_COLLECTOR,
 )
 from agent.identity import get_host_metadata
 from agent.client import CoordinatorClient
@@ -40,16 +38,13 @@ from agent.discovery import discover_coordinator_url
 
 def run_agent():
     metadata = get_host_metadata()
-    if MACAI_AGENT_NAME and MACAI_AGENT_NAME.strip():
-        metadata["hostname"] = MACAI_AGENT_NAME.strip()
-
     host_id = metadata["host_id"]
     logger.info(f"Starting MacAI Storage Agent for {metadata['hostname']} (ID: {host_id})")
 
     # Automatically discover coordinator on local machine or LAN
     coordinator_url = discover_coordinator_url(MACAI_COORDINATOR_URL)
     logger.info(f"Connected coordinator: {coordinator_url}")
-    logger.info(f"Sampling interval: {MACAI_SAMPLE_INTERVAL_SECONDS}s | Elevated mode: {MACAI_ENABLE_ELEVATED_COLLECTOR}")
+    logger.info(f"Sampling interval: {MACAI_SAMPLE_INTERVAL_SECONDS}s")
 
     client = CoordinatorClient(coordinator_url)
     io_sampler = IOSampler()
@@ -120,15 +115,14 @@ def run_agent():
 
             client.send_metrics(batch)
 
-            # 6. Sample process attribution: on abnormal write spikes, elevated mode, or periodically
+            # 6. Sample process attribution: on abnormal write spikes or periodically
             should_sample_processes = (
                 write_bps > 5 * 1024 * 1024
-                or MACAI_ENABLE_ELEVATED_COLLECTOR
                 or iteration == 1
                 or iteration % 5 == 0
             )
             if should_sample_processes:
-                events = collect_active_processes(elevated=MACAI_ENABLE_ELEVATED_COLLECTOR)
+                events = collect_active_processes()
                 if events:
                     client.send_events({
                         "host_id": host_id,

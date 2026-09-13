@@ -3,7 +3,7 @@
 # TTU HackWesTX 2026 • macOS AI File System Metrics Challenge
 # ==============================================================================
 
-.PHONY: help setup server frontend agent agent-elevated install-agent uninstall-agent \
+.PHONY: help setup server frontend agent install-agent uninstall-agent \
         test demo-load demo-nfs demo-nfs-bg stop-nfs reset-demo build clean clean-cache status lint
 
 VENV         ?= .venv
@@ -31,8 +31,7 @@ help:
 	@echo "  setup            Install Python (.venv) and Node (frontend) dependencies"
 	@echo "  server           Start central FastAPI coordinator (http://$(HOST):$(PORT))"
 	@echo "  frontend         Start React/Vite development server (http://localhost:5173)"
-	@echo "  agent            Start local macOS telemetry agent in user mode"
-	@echo "  agent-elevated   Start agent with sudo for fs_usage kernel process attribution"
+	@echo "  agent            Start local macOS telemetry agent"
 	@echo "  build            Build production React bundle (served directly by FastAPI)"
 	@echo ""
 	@echo "Background Agent Daemon (macOS launchd):"
@@ -47,6 +46,8 @@ help:
 	@echo "Demo & Workload Simulation:"
 	@echo "  demo-load        Run safe, bounded local I/O spike workload (/tmp/macai_demo)"
 	@echo "  demo-nfs         Run simulated Parallel NFS (pNFS) distributed AI workload"
+	@echo "  demo-nfs-bg      Run simulated NFS workload in background (detached)"
+	@echo "  stop-nfs         Stop background simulated NFS workload"
 	@echo "  reset-demo       Clean temporary files and reset demo workload state"
 	@echo ""
 	@echo "Maintenance & Cleanup:"
@@ -83,12 +84,8 @@ frontend:
 	@cd $(FRONTEND_DIR) && npm run dev
 
 agent:
-	@echo "[*] Starting MacPulse Telemetry Agent (standard mode)..."
+	@echo "[*] Starting MacPulse Telemetry Agent..."
 	@$(PYTHON) -m agent.main
-
-agent-elevated:
-	@echo "[*] Starting MacPulse Telemetry Agent with elevated privileges (sudo for fs_usage)..."
-	@sudo $(PYTHON) -m agent.main
 
 # ------------------------------------------------------------------------------
 # Native macOS Background Daemon (launchd)

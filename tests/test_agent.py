@@ -48,7 +48,7 @@ def test_auto_discovery(monkeypatch):
 
 def test_collect_active_processes():
     from agent.collectors.process_usage import collect_active_processes
-    procs = collect_active_processes(elevated=False)
+    procs = collect_active_processes()
     assert isinstance(procs, list)
     assert len(procs) > 0
     first = procs[0]

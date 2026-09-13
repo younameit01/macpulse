@@ -46,9 +46,10 @@ function DashboardApp({ theme, toggleTheme }) {
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    // Initial load for immediate rendering
     loadOverview();
 
-    // Connect to Server-Sent Events (SSE) stream
+    // Connect to pure Server-Sent Events (SSE) stream
     const unsubscribe = subscribeOverviewStream(
       (data) => {
         setOverview(data);
@@ -56,23 +57,15 @@ function DashboardApp({ theme, toggleTheme }) {
         setIsSseActive(true);
       },
       (err) => {
-        console.warn('SSE stream fallback to polling:', err);
+        console.warn('SSE stream error:', err);
         setIsSseActive(false);
       }
     );
 
-    // Backup polling timer
-    const backupTimer = setInterval(() => {
-      if (!isSseActive) {
-        loadOverview();
-      }
-    }, 4000);
-
     return () => {
       unsubscribe();
-      clearInterval(backupTimer);
     };
-  }, [isAuthenticated, isSseActive]);
+  }, [isAuthenticated]);
 
   // Route protection / redirect if Admin tries to stay on create-admin view
   useEffect(() => {

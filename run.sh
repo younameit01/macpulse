@@ -30,10 +30,6 @@ case "$1" in
     echo "[*] Starting MacPulse Telemetry Agent..."
     "$PYTHON" -m agent.main
     ;;
-  agent-elevated)
-    echo "[*] Starting MacPulse Telemetry Agent with sudo (elevated fs_usage collector)..."
-    sudo "$PYTHON" -m agent.main
-    ;;
   install-agent)
     "$DIR/scripts/install_launchd_agent.sh"
     ;;
@@ -93,6 +89,13 @@ case "$1" in
     echo "[*] Building React frontend static bundle..."
     (cd "$DIR/frontend" && npm run build)
     ;;
+  clean-cache)
+    echo "[*] Cleaning Python and pytest caches..."
+    find "$DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+    find "$DIR" -type f -name "*.pyc" -delete 2>/dev/null || true
+    rm -rf "$DIR/.pytest_cache" 2>/dev/null || true
+    echo "[+] Cache files cleaned."
+    ;;
   clean)
     echo "[*] Cleaning caches and build artifacts..."
     find "$DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -100,8 +103,36 @@ case "$1" in
     rm -rf "$DIR/.pytest_cache" "$DIR/frontend/dist" 2>/dev/null || true
     echo "[+] Clean complete."
     ;;
+  help|--help|-h|"")
+    echo "=========================================================================="
+    echo "  MacPulse — Shell CLI Runner                                             "
+    echo "=========================================================================="
+    echo "Usage: ./run.sh [command]"
+    echo ""
+    echo "Commands:"
+    echo "  setup            Create virtual environment and install dependencies"
+    echo "  server           Launch central FastAPI coordinator on port 8000"
+    echo "  frontend         Launch Vite React development server on port 5173"
+    echo "  agent            Start local macOS telemetry collector"
+    echo "  install-agent    Install native macOS launchd background service"
+    echo "  uninstall-agent  Unload and remove native macOS launchd service"
+    echo "  test             Run complete automated pytest test suite"
+    echo "  status           Check status of coordinator port 8000 and launchd"
+    echo "  lint             Run frontend linter (oxlint)"
+    echo "  demo-load        Run safe bounded local I/O spike workload generator"
+    echo "  demo-nfs         Run simulated Parallel NFS (pNFS) distributed workload"
+    echo "  demo-nfs-bg      Start simulated NFS workload in background"
+    echo "  stop-nfs         Stop background simulated NFS workload"
+    echo "  reset-demo       Clean temporary files and reset demo workload state"
+    echo "  build            Compile optimized static bundle in frontend/dist"
+    echo "  clean-cache      Remove __pycache__, *.pyc, and .pytest_cache"
+    echo "  clean            Deep clean: remove build artifacts, caches, and dist"
+    echo "=========================================================================="
+    ;;
   *)
-    echo "Usage: ./run.sh {setup|server|frontend|agent|agent-elevated|install-agent|uninstall-agent|test|lint|status|demo-load|demo-nfs|reset-demo|build|clean}"
+    echo "Unknown command: $1"
+    echo "Run './run.sh help' or 'make help' for usage."
     exit 1
     ;;
 esac
+

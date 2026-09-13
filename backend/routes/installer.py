@@ -98,6 +98,47 @@ echo "=================================================="
     return script
 
 
+@router.get("/uninstall", response_class=PlainTextResponse)
+def get_uninstall_script():
+    """
+    Returns a self-contained 1-line uninstallation bash script for remote Macs.
+    Usage on any Mac: curl -fsSL http://<coordinator-ip>:8000/uninstall | bash
+    """
+    script = """#!/usr/bin/env bash
+set -e
+
+PLIST_LABEL="com.macai.storage.agent"
+PLIST_FILE="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
+INSTALL_DIR="$HOME/.macai/agent"
+
+echo "=================================================="
+echo " MacPulse - Remote Agent Uninstallation           "
+echo "=================================================="
+
+# 1. Unload and delete launchd background service
+if [ -f "$PLIST_FILE" ]; then
+    echo "[*] Unloading and removing macOS launchd service..."
+    launchctl unload "$PLIST_FILE" 2>/dev/null || true
+    rm -f "$PLIST_FILE"
+    echo "[+] Removed $PLIST_FILE"
+else
+    echo "[*] launchd service plist not found (already removed)."
+fi
+
+# 2. Clean up installed agent files and virtual environment
+if [ -d "$INSTALL_DIR" ]; then
+    echo "[*] Cleaning up isolated agent runtime at $INSTALL_DIR..."
+    rm -rf "$INSTALL_DIR"
+    echo "[+] Removed $INSTALL_DIR"
+fi
+
+echo ""
+echo "[+] SUCCESS! MacPulse telemetry agent completely removed."
+echo "=================================================="
+"""
+    return script
+
+
 @router.get("/agent-bundle.tar.gz")
 def get_agent_bundle():
     """
