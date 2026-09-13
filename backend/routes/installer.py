@@ -12,8 +12,9 @@ def get_install_script(request: Request):
     Returns a self-contained 1-line installation bash script for remote Macs.
     Usage on any Mac: curl -fsSL http://<coordinator-ip>:8000/install | bash
     """
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "http"
     host_header = request.headers.get("host", "localhost:8000")
-    coordinator_url = f"http://{host_header}"
+    coordinator_url = f"{proto}://{host_header}"
 
     script = f"""#!/usr/bin/env bash
 set -e
@@ -105,6 +106,12 @@ def get_agent_bundle():
     """
     root_dir = Path(__file__).resolve().parent.parent.parent
     agent_dir = root_dir / "agent"
+    if not agent_dir.exists():
+        agent_dir = Path("/app/agent")
+    if not agent_dir.exists():
+        agent_dir = Path("agent")
+    if not agent_dir.exists():
+        raise RuntimeError(f"Agent directory not found at candidate paths: {root_dir}/agent, /app/agent")
 
     tar_bytes = io.BytesIO()
     with tarfile.open(fileobj=tar_bytes, mode="w:gz") as tar:

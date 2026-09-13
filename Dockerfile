@@ -23,6 +23,7 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # Copy backend code, scripts, and runtime files
 COPY backend/ ./backend/
+COPY agent/ ./agent/
 COPY scripts/ ./scripts/
 COPY run.sh ./run.sh
 COPY README.md ./README.md
