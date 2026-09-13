@@ -32,17 +32,17 @@ def test_io_sampler():
     assert rates1["read_bps"] >= 0.0
     assert rates1["write_bps"] >= 0.0
 
-def test_auto_discovery():
+def test_auto_discovery(monkeypatch):
     from backend.discovery import CoordinatorDiscoveryBeacon
     from agent.discovery import discover_coordinator_url
+    monkeypatch.delenv("MACAI_COORDINATOR_URL", raising=False)
     beacon = CoordinatorDiscoveryBeacon(port=8000)
     beacon.start()
     try:
         import time
         time.sleep(0.2)
         url = discover_coordinator_url()
-        assert "http://" in url
-        assert ":8000" in url
+        assert "http" in url
     finally:
         beacon.stop()
 

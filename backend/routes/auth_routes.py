@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 import httpx
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 
@@ -147,6 +147,7 @@ def get_current_user_profile(
 @router.post("/admins", response_model=CreateAdminResponse, status_code=status.HTTP_201_CREATED)
 async def create_admin(
     req: CreateAdminRequest,
+    request: Request,
     current_user: AuthenticatedUser = Depends(require_super_admin),
     db: Session = Depends(get_db),
 ):
@@ -173,7 +174,9 @@ async def create_admin(
 
     # Generate a secure, unique one-time invitation token
     invite_token = secrets.token_urlsafe(32)
-    setup_url = f"http://localhost:3000/?invite={invite_token}"
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
+    host_header = request.headers.get("host") or "macpulse.tech"
+    setup_url = f"{proto}://{host_header}/?invite={invite_token}"
 
     new_admin = AdminUser(
         id=str(uuid.uuid4()),

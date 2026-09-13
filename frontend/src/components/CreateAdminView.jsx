@@ -95,11 +95,25 @@ export default function CreateAdminView({ onBack }) {
     }
   };
 
-  const inviteUrl = createdAdmin?.setup_link || (
-    typeof window !== 'undefined' && createdAdmin?.email
-      ? `${window.location.origin}/?email=${encodeURIComponent(createdAdmin.email)}`
-      : ''
-  );
+  const inviteUrl = (() => {
+    if (!createdAdmin?.setup_link) {
+      return typeof window !== 'undefined' && createdAdmin?.email
+        ? `${window.location.origin}/?email=${encodeURIComponent(createdAdmin.email)}`
+        : '';
+    }
+    try {
+      if (typeof window !== 'undefined' && window.location.origin) {
+        const url = new URL(createdAdmin.setup_link);
+        // If the setup link contains localhost, 127.0.0.1, or port 3000, adapt to current origin
+        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.port === '3000') {
+          return `${window.location.origin}${url.pathname}${url.search}`;
+        }
+      }
+    } catch {
+      // Ignore URL parsing errors and fallback
+    }
+    return createdAdmin.setup_link;
+  })();
 
   const handleCopyLink = () => {
     if (!inviteUrl) return;
