@@ -8,7 +8,7 @@ LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 PLIST_FILE="$LAUNCH_AGENTS_DIR/$PLIST_LABEL.plist"
 LOG_DIR="$HOME/.macai"
 
-echo "[*] Installing MacAI Storage Observatory background service (macOS launchd)..."
+echo "[*] Installing MacPulse background service (macOS launchd)..."
 
 # 1. Verify virtual environment exists
 if [ ! -f "$PYTHON" ]; then

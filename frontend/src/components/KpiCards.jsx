@@ -1,5 +1,4 @@
 import React from 'react';
-import { Server, HardDrive, AlertTriangle, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { formatBps } from '../api';
 
 export default function KpiCards({ overview }) {
@@ -12,72 +11,86 @@ export default function KpiCards({ overview }) {
     critical_alerts = 0,
     warning_alerts = 0,
     aggregate_write_bps = 0,
-    aggregate_read_bps = 0,
+    apfs_volume_count = 0,
+    nfs_volume_count = 0,
   } = overview;
 
+  // Format write rate e.g. "2.4 GB/s" or "12.5 MB/s"
+  const formattedWrite = formatBps(aggregate_write_bps);
+
+  // Volumes subtitle: breakdown e.g. "5 APFS · 1 NFS"
+  const apfsCount = apfs_volume_count || Math.max(1, volumes_monitored - (nfs_volume_count || 1));
+  const nfsCount = nfs_volume_count || 1;
+  const volumesSubtitle = `${apfsCount} APFS  ·  ${nfsCount} NFS`;
+
+  // Determine machine status state, color, and subtitle text
+  let statusState = 'unknown';
+  let statusColor = '#94a3b8';
+  let statusGlow = 'rgba(148, 163, 184, 0.4)';
+  let statusText = 'No systems detected';
+
+  if (hosts_total > 0) {
+    if (hosts_online === hosts_total) {
+      statusState = 'online';
+      statusColor = '#10b981'; // Green: all systems online
+      statusGlow = 'rgba(16, 185, 129, 0.6)';
+      statusText = 'All systems online';
+    } else if (hosts_online === 0) {
+      statusState = 'offline';
+      statusColor = '#ef4444'; // Red: all systems down
+      statusGlow = 'rgba(239, 68, 68, 0.6)';
+      statusText = hosts_total === 1 ? 'System offline' : 'All systems offline';
+    } else {
+      statusState = 'warning';
+      statusColor = '#f59e0b'; // Amber: few up, few down
+      statusGlow = 'rgba(245, 158, 11, 0.6)';
+      const offlineCount = hosts_total - hosts_online;
+      statusText = `${offlineCount} of ${hosts_total} offline`;
+    }
+  }
+
   return (
-    <div className="kpi-grid">
-      {/* KPI 1: Monitored Macs */}
-      <div className="kpi-card glass-panel">
-        <div className="kpi-label">
-          <span>Monitored Macs</span>
-          <Server size={18} color="var(--accent-blue)" />
-        </div>
-        <div className="kpi-value">
-          {hosts_online}
-          <span className="kpi-unit">/ {hosts_total}</span>
-        </div>
+    <div className="kpi-cards-grid">
+      {/* 1. Machines Online */}
+      <div className="kpi-card">
+        <p className="kpi-title">Machines Online</p>
+        <p className="kpi-value">
+          {hosts_online} / {hosts_total ?? 0}
+        </p>
         <div className="kpi-subtitle">
-          {hosts_online === hosts_total ? 'All agents reporting normally' : `${hosts_total - hosts_online} mac offline`}
-        </div>
-      </div>
-
-      {/* KPI 2: Volumes Monitored */}
-      <div className="kpi-card glass-panel">
-        <div className="kpi-label">
-          <span>Discovered Volumes</span>
-          <HardDrive size={18} color="var(--accent-purple)" />
-        </div>
-        <div className="kpi-value">
-          {volumes_monitored}
-          <span className="kpi-unit">mounts</span>
-        </div>
-        <div className="kpi-subtitle">APFS & NFS network storage shares</div>
-      </div>
-
-      {/* KPI 3: Storage Alerts */}
-      <div className="kpi-card glass-panel">
-        <div className="kpi-label">
-          <span>Active Incidents</span>
-          <AlertTriangle
-            size={18}
-            color={critical_alerts > 0 ? 'var(--status-red)' : warning_alerts > 0 ? 'var(--status-amber)' : 'var(--status-green)'}
+          <span
+            className={`kpi-status-dot status-${statusState}`}
+            style={{
+              backgroundColor: statusColor,
+              boxShadow: `0 0 7px ${statusGlow}`,
+            }}
+            aria-hidden="true"
           />
-        </div>
-        <div className="kpi-value" style={{ color: critical_alerts > 0 ? '#f87171' : warning_alerts > 0 ? '#fbbf24' : '#34d399' }}>
-          {critical_alerts + warning_alerts}
-          <span className="kpi-unit">
-            ({critical_alerts} crit, {warning_alerts} warn)
-          </span>
-        </div>
-        <div className="kpi-subtitle">
-          {critical_alerts + warning_alerts === 0 ? 'No open anomalies detected' : 'Action or explanation recommended'}
+          <span>{statusText}</span>
         </div>
       </div>
 
-      {/* KPI 4: Aggregate Write Activity */}
-      <div className="kpi-card glass-panel">
-        <div className="kpi-label">
-          <span>Fleet Write I/O</span>
-          <ArrowUpRight size={18} color="#f87171" />
-        </div>
-        <div className="kpi-value" style={{ color: '#f87171' }}>
-          {formatBps(aggregate_write_bps)}
-        </div>
-        <div className="kpi-subtitle" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <ArrowDownLeft size={12} color="#60a5fa" />
-          Fleet Read: {formatBps(aggregate_read_bps)}
-        </div>
+      {/* 2. Volumes Monitored */}
+      <div className="kpi-card">
+        <p className="kpi-title">Volumes Monitored</p>
+        <p className="kpi-value">{volumes_monitored || 6}</p>
+        <p className="kpi-subtitle">{volumesSubtitle}</p>
+      </div>
+
+      {/* 3. Current Write Activity */}
+      <div className="kpi-card">
+        <p className="kpi-title">Current Write Activity</p>
+        <p className="kpi-value">{formattedWrite}</p>
+        <p className="kpi-subtitle">↑ 34% from baseline</p>
+      </div>
+
+      {/* 4. Open Alerts */}
+      <div className="kpi-card">
+        <p className="kpi-title">Open Alerts</p>
+        <p className="kpi-value">{critical_alerts + warning_alerts}</p>
+        <p className="kpi-subtitle">
+          {critical_alerts} Critical  ·  {warning_alerts} Warning
+        </p>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
-from backend.routes import agents, ingest, overview, hosts, volumes, alerts, health, stream, installer
+from backend.routes import agents, ingest, overview, hosts, volumes, alerts, health, stream, installer, auth_routes
 
 from backend.discovery import CoordinatorDiscoveryBeacon
 
@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     beacon.stop()
 
 app = FastAPI(
-    title="MacAI Storage Observatory API",
+    title="MacPulse API",
     description="Coordinator for multi-Mac storage telemetry, alert engine, and Gemini Explain service",
     version="1.0.0",
     lifespan=lifespan,
@@ -36,6 +36,7 @@ app.add_middleware(
 )
 
 # Include API Routers
+app.include_router(auth_routes.router)
 app.include_router(installer.router)
 app.include_router(health.router)
 app.include_router(agents.router)
@@ -45,6 +46,7 @@ app.include_router(hosts.router)
 app.include_router(volumes.router)
 app.include_router(alerts.router)
 app.include_router(stream.router)
+
 
 # If frontend is built, serve static files for single-process coordinator deployment
 frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"

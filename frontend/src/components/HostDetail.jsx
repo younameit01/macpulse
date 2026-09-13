@@ -1,18 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Server, HardDrive, Cpu, User, AlertTriangle, Sparkles, Clock, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Server, HardDrive, Cpu, User } from 'lucide-react';
 import { fetchHostDetail, fetchHostMetrics, formatBytes, formatBps } from '../api';
+import { formatLocalTime } from '../alertUtils';
 import IoChart from './IoChart';
+import HardwareHealthCard from './HardwareHealthCard';
+import SystemResourcesCard from './SystemResourcesCard';
+import AlertsPanel from './AlertsPanel';
 
 export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAlert }) {
   const [host, setHost] = useState(null);
   const [metrics, setMetrics] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState('15 min');
+
+  const rangeMinutesMap = {
+    '5 min': 5,
+    '15 min': 15,
+    '30 min': 30,
+    '1 hr': 60,
+  };
+  const currentMinutes = rangeMinutesMap[timeRange] || 15;
 
   const loadData = async () => {
     try {
       const [hData, mData] = await Promise.all([
         fetchHostDetail(hostId),
-        fetchHostMetrics(hostId, 15),
+        fetchHostMetrics(hostId, currentMinutes),
       ]);
       setHost(hData);
       setMetrics(mData);
@@ -27,11 +40,11 @@ export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAl
     loadData();
     const interval = setInterval(loadData, 3000);
     return () => clearInterval(interval);
-  }, [hostId]);
+  }, [hostId, currentMinutes]);
 
   if (loading && !host) {
     return (
-      <div className="glass-panel" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+      <div className="card-container" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
         Loading host telemetry...
       </div>
     );
@@ -39,77 +52,88 @@ export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAl
 
   if (!host) {
     return (
-      <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
-        <p style={{ color: '#f87171' }}>Host not found</p>
+      <div className="card-container" style={{ padding: 40, textAlign: 'center' }}>
+        <p style={{ color: 'var(--alert-crit-border)' }}>Host not found</p>
         <button onClick={onBack} className="btn-primary" style={{ marginTop: 12 }}>
-          <ArrowLeft size={14} /> Back to Fleet
+          <ArrowLeft size={14} /> Back to Dashboard
         </button>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Top Bar with Back Button */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <button
-          onClick={onBack}
-          style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid var(--border-subtle)',
-            color: 'var(--text-main)',
-            padding: '8px 16px',
-            borderRadius: 8,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          <ArrowLeft size={15} /> Back to Fleet Overview
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className={`badge ${host.status === 'online' ? 'badge-online' : 'badge-offline'}`}>
-            {host.status}
-          </span>
-          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-            Last seen: {new Date(host.last_seen).toLocaleTimeString()}
-          </span>
-        </div>
-      </div>
-
-      {/* Host Meta Card */}
-      <div className="glass-panel" style={{ padding: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ padding: 14, background: 'rgba(59, 130, 246, 0.15)', borderRadius: 14, border: '1px solid rgba(59, 130, 246, 0.3)' }}>
-            <Server size={28} color="var(--accent-blue)" />
-          </div>
-          <div>
-            <h2 style={{ fontSize: 22, fontWeight: 700, color: '#ffffff' }}>{host.hostname}</h2>
-            <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-              <span>ID: <code className="mono-text">{host.id}</code></span>
-              <span>OS: <strong style={{ color: '#cbd5e1' }}>{host.os_version}</strong></span>
-              <span>Agent: v{host.agent_version}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {/* Host Meta Card (Compact height & local time) */}
+      <div className="card-container" style={{ padding: '14px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div
+              style={{
+                padding: '8px 10px',
+                background: 'var(--bg-subtle)',
+                borderRadius: 10,
+                border: '1px solid var(--border-subtle)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Server size={20} color="var(--chart-read)" />
+            </div>
+            <div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
+                {host.hostname}
+              </h2>
+              <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--text-muted)', marginTop: 3, flexWrap: 'wrap' }}>
+                <span>ID: <code className="mono-text" style={{ fontSize: 11 }}>{host.id}</code></span>
+                <span>OS: <strong style={{ color: 'var(--text-main)' }}>{host.os_version}</strong></span>
+              </div>
             </div>
           </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className={`badge ${host.status === 'online' ? 'badge-online' : 'badge-offline'}`} style={{ padding: '4px 10px', fontSize: 11 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: host.status === 'online' ? '#10b981' : '#ef4444' }}></span>
+              {host.status}
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+              Last seen: <strong style={{ color: 'var(--text-main)', fontWeight: 500 }}>{formatLocalTime(host.last_seen)}</strong>
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Throughput Chart */}
-      <div className="glass-panel" style={{ padding: 24 }}>
-        <IoChart data={metrics} height={200} title="Historical Throughput (Last 15 Minutes)" />
+      {/* Hardware & S.M.A.R.T. Health Card */}
+      <HardwareHealthCard diskHealth={host.disk_health} />
+
+      {/* Analytics Row: Host I/O Activity (Left 50%) + System Compute & Memory Telemetry (Right 50%) */}
+      <div className="host-analytics-row-grid">
+        <div className="card-container" style={{ padding: 24, minHeight: 336, display: 'flex', flexDirection: 'column' }}>
+          <IoChart
+            data={metrics}
+            height={210}
+            title="Host I/O Activity"
+            subtitle={`Read and write throughput over the last ${timeRange}`}
+            timeRange={timeRange}
+            onTimeRangeChange={setTimeRange}
+          />
+        </div>
+        <SystemResourcesCard
+          systemResources={host.system_resources}
+        />
       </div>
 
       {/* Volumes Table */}
-      <div className="glass-panel" style={{ padding: 24 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#ffffff', marginBottom: 14 }}>Mounted Filesystems</h3>
+      <div className="card-container" style={{ padding: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 14 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-main)' }}>Mounted Filesystems</h3>
+          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Primary physical storage and network mounts</span>
+        </div>
         <div className="data-table-container">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Mount Point</th>
+                <th>Volume & Role</th>
                 <th>Type</th>
                 <th>Source Device</th>
                 <th>Capacity / Used</th>
@@ -120,17 +144,67 @@ export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAl
             <tbody>
               {host.volumes.map((v) => {
                 const isNfs = v.fs_type.toLowerCase() === 'nfs';
-                const fillClass = v.used_pct >= 90 ? 'fill-red' : v.used_pct >= 80 ? 'fill-amber' : 'fill-green';
+                const isInternal = v.mount_path === '/System/Volumes/Data' || v.mount_path === '/';
+
+                let title = v.mount_path;
+                let role = null;
+                if (isInternal) {
+                  title = 'Macintosh HD';
+                  role = 'Internal APFS SSD · Applications & User Data';
+                } else if (v.mount_path.startsWith('/Volumes/')) {
+                  title = v.mount_path.replace('/Volumes/', '');
+                  role = isNfs ? 'NFS Cluster Export' : 'External / Network Volume';
+                }
+
                 return (
                   <tr key={v.id}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <HardDrive size={16} color={isNfs ? '#c084fc' : '#60a5fa'} />
-                        <span className="mono-text" style={{ fontWeight: 600, color: '#ffffff' }}>{v.mount_path}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <HardDrive size={18} color={isNfs ? '#c084fc' : 'var(--chart-read)'} />
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: 13 }}>
+                              {title}
+                            </span>
+                            {isInternal && (
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  fontWeight: 700,
+                                  padding: '1px 5px',
+                                  borderRadius: 4,
+                                  background: 'rgba(56, 189, 248, 0.12)',
+                                  color: '#38bdf8',
+                                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                                }}
+                              >
+                                Internal SSD
+                              </span>
+                            )}
+                            {isNfs && (
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  fontWeight: 700,
+                                  padding: '1px 5px',
+                                  borderRadius: 4,
+                                  background: 'rgba(192, 132, 252, 0.15)',
+                                  color: '#c084fc',
+                                  border: '1px solid rgba(192, 132, 252, 0.3)',
+                                }}
+                              >
+                                NFS
+                              </span>
+                            )}
+                          </div>
+                          <div className="mono-text" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+                            {v.mount_path} {role ? `· ${role}` : ''}
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td>
-                      <span className={`badge ${isNfs ? 'badge-nfs' : 'badge-apfs'}`}>
+                      <span className="badge" style={{ background: 'var(--bg-subtle)', color: 'var(--text-main)' }}>
                         {v.fs_type.toUpperCase()}
                       </span>
                     </td>
@@ -140,19 +214,26 @@ export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAl
                       </span>
                     </td>
                     <td style={{ minWidth: 180 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                         <span>{formatBytes(v.used_bytes)} / {formatBytes(v.total_bytes)}</span>
                         <strong>{v.used_pct}%</strong>
                       </div>
-                      <div className="progress-container">
-                        <div className={`progress-fill ${fillClass}`} style={{ width: `${Math.min(100, v.used_pct)}%` }}></div>
+                      <div style={{ width: '100%', height: 6, background: 'var(--bg-subtle)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            width: `${Math.min(100, v.used_pct)}%`,
+                            height: '100%',
+                            backgroundColor: v.used_pct >= 90 ? 'var(--alert-crit-border)' : v.used_pct >= 80 ? 'var(--alert-warn-border)' : 'var(--chart-read)',
+                            borderRadius: 3,
+                          }}
+                        />
                       </div>
                     </td>
                     <td>
                       <div style={{ fontSize: 12 }}>
-                        <span style={{ color: '#f87171' }}>W: {formatBps(v.current_write_bps)}</span>
+                        <span style={{ color: 'var(--alert-crit-border)' }}>W: {formatBps(v.current_write_bps)}</span>
                         <span style={{ color: 'var(--text-dim)', margin: '0 6px' }}>|</span>
-                        <span style={{ color: '#60a5fa' }}>R: {formatBps(v.current_read_bps)}</span>
+                        <span style={{ color: 'var(--chart-read)' }}>R: {formatBps(v.current_read_bps)}</span>
                       </div>
                     </td>
                     <td style={{ textAlign: 'right' }}>
@@ -172,22 +253,47 @@ export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAl
         </div>
       </div>
 
+      {/* Active & Recent Host Alerts */}
+      <AlertsPanel
+        alerts={host.recent_alerts || []}
+        title="Active & Recent Host Alerts"
+        subtitle="Deterministic threshold, rolling baseline, and administrator alert lifecycle for this host"
+        onExplainAlert={onExplainAlert}
+        onAlertUpdated={loadData}
+        scrollable={Boolean(host.recent_alerts && host.recent_alerts.length > 6)}
+        maxHeight={host.recent_alerts && host.recent_alerts.length > 6 ? 480 : undefined}
+      />
+
       {/* Attribution & Process Activity Panel */}
-      <div className="glass-panel" style={{ padding: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <Cpu size={20} color="var(--accent-purple)" />
-          <div>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>Process Attribution Evidence</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Filesystem write activity sampled from elevated/process collectors</p>
+      <div className="card-container" style={{ padding: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Cpu size={20} color="var(--chart-read)" />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-main)' }}>Process Attribution Evidence</h3>
+                {host.recent_events.length > 0 && (
+                  <span className="badge" style={{ background: 'var(--bg-subtle)', color: 'var(--text-main)', fontSize: 11 }}>
+                    {host.recent_events.length} event{host.recent_events.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Real-time host process activity and filesystem attribution sampled by agent</p>
+            </div>
           </div>
+          {host.recent_events.length > 6 && (
+            <span style={{ fontSize: 11, color: 'var(--text-dim)', background: 'var(--bg-subtle)', padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
+              Showing 6 rows · Scroll to view all {host.recent_events.length}
+            </span>
+          )}
         </div>
 
         {host.recent_events.length === 0 ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, background: 'rgba(0,0,0,0.15)', borderRadius: 8 }}>
-            No process attribution events captured. Run agent with <code>MACAI_ENABLE_ELEVATED_COLLECTOR=true</code> to capture elevated syscall traces.
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, background: 'var(--bg-subtle)', borderRadius: 8 }}>
+            No process attribution events captured yet. The agent samples active processes periodically and on disk write spikes.
           </div>
         ) : (
-          <div className="data-table-container">
+          <div className="data-table-container table-scroll-6">
             <table className="data-table">
               <thead>
                 <tr>
@@ -196,7 +302,8 @@ export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAl
                   <th>PID</th>
                   <th>User</th>
                   <th>Operation</th>
-                  <th>Cumulative I/O</th>
+                  <th>Target Mount</th>
+                  <th>Footprint / I/O</th>
                 </tr>
               </thead>
               <tbody>
@@ -204,11 +311,11 @@ export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAl
                   <tr key={ev.id}>
                     <td>
                       <span className="mono-text" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                        {new Date(ev.timestamp).toLocaleTimeString()}
+                        {formatLocalTime(ev.timestamp)}
                       </span>
                     </td>
                     <td>
-                      <strong style={{ color: '#ffffff' }}>{ev.process}</strong>
+                      <strong style={{ color: 'var(--text-main)' }}>{ev.process}</strong>
                     </td>
                     <td>
                       <span className="mono-text">{ev.pid || 'N/A'}</span>
@@ -220,8 +327,13 @@ export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAl
                       </div>
                     </td>
                     <td>
-                      <span className="badge badge-apfs" style={{ fontSize: 11 }}>
-                        {ev.operation || 'write'}
+                      <span className="badge" style={{ background: 'var(--bg-subtle)', color: 'var(--text-main)', fontSize: 11 }}>
+                        {ev.operation || 'active'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="mono-text" style={{ fontSize: 12, color: 'var(--chart-read)' }}>
+                        {ev.volume_mount || '—'}
                       </span>
                     </td>
                     <td>
@@ -234,47 +346,6 @@ export default function HostDetail({ hostId, onBack, onSelectVolume, onExplainAl
           </div>
         )}
       </div>
-
-      {/* Host Alerts */}
-      {host.recent_alerts.length > 0 && (
-        <div className="glass-panel" style={{ padding: 24 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#ffffff', marginBottom: 14 }}>Active & Recent Host Alerts</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {host.recent_alerts.map((a) => (
-              <div
-                key={a.id}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '12px 16px',
-                  borderRadius: 10,
-                  background: a.severity === 'critical' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)',
-                  border: `1px solid ${a.severity === 'critical' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className={`badge ${a.severity === 'critical' ? 'badge-critical' : 'badge-warning'}`}>
-                      {a.severity}
-                    </span>
-                    <strong style={{ color: '#ffffff' }}>{a.message}</strong>
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Opened: {new Date(a.opened_at).toLocaleTimeString()}
-                  </div>
-                </div>
-                <button
-                  onClick={() => onExplainAlert(a)}
-                  className="btn-explain"
-                >
-                  <Sparkles size={14} /> Explain
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

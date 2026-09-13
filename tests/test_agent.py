@@ -46,3 +46,28 @@ def test_auto_discovery():
     finally:
         beacon.stop()
 
+def test_collect_active_processes():
+    from agent.collectors.process_usage import collect_active_processes
+    procs = collect_active_processes(elevated=False)
+    assert isinstance(procs, list)
+    assert len(procs) > 0
+    first = procs[0]
+    assert "process" in first
+    assert "pid" in first
+    assert "operation" in first
+    assert "timestamp" in first
+
+
+def test_collect_disk_health():
+    from agent.collectors.smart_stats import collect_disk_health
+    health = collect_disk_health()
+    assert isinstance(health, dict)
+    assert "smart_status" in health
+    assert "is_solid_state" in health
+    assert health["smart_status"] in ["Verified", "Failing", "Unknown", "Unavailable"]
+    if health["temp_celsius"] is not None:
+        assert 0 < health["temp_celsius"] < 120
+    if health["ssd_wear_pct"] is not None:
+        assert 0 <= health["ssd_wear_pct"] <= 100
+
+

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Controlled safe I/O workload generator for MacAI Storage Observatory demo.
+Controlled safe I/O workload generator for MacPulse demo.
 Simulates AI checkpointing and dataset file creation in a dedicated temporary directory.
 Adheres strictly to PRD Section 4.3, 17.1 (AC-12), and 20.3:
 - Bounded file size (never exhausts disk).
@@ -20,7 +20,7 @@ CHUNK_SIZE = 1024 * 1024  # 1MB chunks
 TARGET_TOTAL_MB = int(os.getenv("DEMO_TARGET_MB", "120"))  # 120MB bounded total
 
 def run_load():
-    print(f"[*] Starting MacAI safe controlled I/O workload...")
+    print(f"[*] Starting MacPulse safe controlled I/O workload...")
     print(f"[*] Target directory: {DEMO_DIR}")
     print(f"[*] Target volume payload: {TARGET_TOTAL_MB} MB")
 
@@ -49,7 +49,7 @@ def run_load():
     elapsed = time.time() - start
     rate = (written * 1024 * 1024) / max(0.1, elapsed) / (1024 * 1024)
     print(f"[+] Workload finished: {written} MB written in {elapsed:.2f}s (~{rate:.1f} MB/s).")
-    print(f"[+] The MacAI Observatory dashboard will reflect this spike and trigger alert rules.")
+    print(f"[+] The MacPulse dashboard will reflect this spike and trigger alert rules.")
 
 if __name__ == "__main__":
     run_load()

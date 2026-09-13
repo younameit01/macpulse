@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 from backend.database import get_db
 from backend.models import Host, Volume, MetricSample, ProcessEvent, Alert, utc_now
 from backend.schemas import HostDetailResponse, VolumeSummary, AlertSummary, MetricPoint
+from backend.alert_utils import deduplicate_alerts
 
 router = APIRouter(prefix="/api/v1/hosts", tags=["hosts"])
 
@@ -19,16 +20,48 @@ def list_hosts(db: Session = Depends(get_db)):
         latest = db.query(MetricSample).filter(
             MetricSample.host_id == h.id
         ).order_by(desc(MetricSample.timestamp)).first()
+
+        disk_health = None
+        if h.disk_health_json:
+            try:
+                disk_health = json.loads(h.disk_health_json)
+            except Exception:
+                pass
+
+        system_resources = None
+        if h.system_resources_json:
+            try:
+                system_resources = json.loads(h.system_resources_json)
+            except Exception:
+                pass
+
+        last_seen_dt = h.last_seen
+        if last_seen_dt and last_seen_dt.tzinfo is None:
+            last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
+
+        has_data = any(v.mount_path == "/System/Volumes/Data" for v in h.volumes)
+        active_count = sum(
+            1 for v in h.volumes
+            if not (v.mount_path == "/" and has_data)
+            and (v.fs_type or "").lower() not in ("nullfs", "devfs", "autofs", "procfs")
+            and "/AppTranslocation/" not in v.mount_path
+            and not v.mount_path.startswith("/private/var/folders/")
+            and not v.mount_path.startswith("/Volumes/Recovery")
+            and not ((v.fs_type or "").lower() == "hfs" and v.mount_path.startswith("/Volumes/"))
+        )
+
         result.append({
             "id": h.id,
             "hostname": h.hostname,
             "os_version": h.os_version,
             "agent_version": h.agent_version,
             "status": h.status,
-            "last_seen": h.last_seen,
-            "volume_count": len(h.volumes),
+            "last_seen": last_seen_dt,
+            "volume_count": active_count,
             "current_write_bps": latest.write_bps if latest else 0.0,
             "current_read_bps": latest.read_bps if latest else 0.0,
+            "disk_health": disk_health,
+            "system_resources": system_resources,
         })
     return result
 
@@ -39,9 +72,22 @@ def get_host_detail(host_id: str, db: Session = Depends(get_db)):
     if not host:
         raise HTTPException(status_code=404, detail="Host not found")
 
-    # Volumes summary
+    # Volumes summary (consolidated to avoid duplicate APFS container pools)
+    has_data_vol = any(v.mount_path == "/System/Volumes/Data" for v in host.volumes)
     volume_summaries = []
     for v in host.volumes:
+        fs = (v.fs_type or "").lower()
+        if fs in ("nullfs", "devfs", "autofs", "procfs"):
+            continue
+        if "/AppTranslocation/" in v.mount_path or v.mount_path.startswith("/private/var/folders/"):
+            continue
+        if v.mount_path == "/Volumes/Recovery" or v.mount_path.startswith("/Volumes/Recovery/"):
+            continue
+        if fs == "hfs" and v.mount_path.startswith("/Volumes/"):
+            continue
+        if v.mount_path == "/" and has_data_vol:
+            continue
+
         latest_vol_sample = db.query(MetricSample).filter(
             MetricSample.volume_id == v.id
         ).order_by(desc(MetricSample.timestamp)).first()
@@ -67,30 +113,8 @@ def get_host_detail(host_id: str, db: Session = Depends(get_db)):
         )
 
     # Alerts for this host
-    alerts_query = db.query(Alert).filter(Alert.host_id == host.id).order_by(desc(Alert.opened_at)).limit(15).all()
-    alert_summaries = []
-    for a in alerts_query:
-        evidence = {}
-        try:
-            evidence = json.loads(a.evidence_json)
-        except Exception:
-            evidence = {}
-        alert_summaries.append(
-            AlertSummary(
-                id=a.id,
-                host_id=a.host_id,
-                hostname=host.hostname,
-                volume_id=a.volume_id,
-                volume_mount=evidence.get("volume_mount"),
-                type=a.type,
-                severity=a.severity,
-                status=a.status,
-                opened_at=a.opened_at,
-                closed_at=a.closed_at,
-                message=evidence.get("message", f"{a.type} alert"),
-                evidence=evidence,
-            )
-        )
+    alerts_query = db.query(Alert).filter(Alert.host_id == host.id).order_by(desc(Alert.last_seen_at), desc(Alert.opened_at)).limit(50).all()
+    alert_summaries = deduplicate_alerts(alerts_query)
 
     # Recent process attribution events
     events_query = db.query(ProcessEvent).filter(
@@ -106,9 +130,28 @@ def get_host_detail(host_id: str, db: Session = Depends(get_db)):
             "operation": e.operation,
             "bytes": e.bytes,
             "volume_id": e.volume_id,
+            "volume_mount": e.volume_id.split(":", 1)[1] if (e.volume_id and ":" in e.volume_id) else e.volume_id,
         }
         for e in events_query
     ]
+
+    disk_health = None
+    if host.disk_health_json:
+        try:
+            disk_health = json.loads(host.disk_health_json)
+        except Exception:
+            pass
+
+    system_resources = None
+    if host.system_resources_json:
+        try:
+            system_resources = json.loads(host.system_resources_json)
+        except Exception:
+            pass
+
+    last_seen_dt = host.last_seen
+    if last_seen_dt and last_seen_dt.tzinfo is None:
+        last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
 
     return HostDetailResponse(
         id=host.id,
@@ -116,10 +159,12 @@ def get_host_detail(host_id: str, db: Session = Depends(get_db)):
         os_version=host.os_version,
         agent_version=host.agent_version,
         status=host.status,
-        last_seen=host.last_seen,
+        last_seen=last_seen_dt,
         volumes=volume_summaries,
         recent_alerts=alert_summaries,
         recent_events=events_list,
+        disk_health=disk_health,
+        system_resources=system_resources,
     )
 
 

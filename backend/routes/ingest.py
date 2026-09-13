@@ -1,3 +1,4 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Dict, Any
@@ -5,7 +6,14 @@ from typing import Dict, Any
 from backend.database import get_db
 from backend.models import Host, Volume, MetricSample, ProcessEvent, utc_now
 from backend.schemas import MetricsIngestBatch, EventsIngestBatch
-from backend.engine import evaluate_capacity_rules, evaluate_abnormal_write_rules, check_agent_liveness
+from backend.engine import (
+    evaluate_capacity_rules,
+    evaluate_abnormal_write_rules,
+    evaluate_nfs_rules,
+    evaluate_hardware_health_rules,
+    evaluate_system_resource_rules,
+    check_agent_liveness,
+)
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["ingest"])
 
@@ -75,6 +83,26 @@ def ingest_metrics(batch: MetricsIngestBatch, db: Session = Depends(get_db)):
 
         # Evaluate abnormal write rules
         evaluate_abnormal_write_rules(db, host, vol_obj, sample.write_bps)
+
+        # Evaluate NFS RPC retransmissions & protocol rules
+        if vol_obj and vol_obj.fs_type.lower() == "nfs":
+            evaluate_nfs_rules(db, host, vol_obj, sample.nfs_ops_per_sec, sample.nfs_retrans)
+
+    # 3. Persist and evaluate S.M.A.R.T. & hardware health metrics
+    if batch.disk_health:
+        try:
+            host.disk_health_json = json.dumps(batch.disk_health)
+            evaluate_hardware_health_rules(db, host, batch.disk_health)
+        except Exception:
+            pass
+
+    # 4. Persist and evaluate System Compute, Memory Pressure & Thermal metrics
+    if batch.system_resources:
+        try:
+            host.system_resources_json = json.dumps(batch.system_resources)
+            evaluate_system_resource_rules(db, host, batch.system_resources)
+        except Exception:
+            pass
 
     db.commit()
     return {"status": "ok", "ingested_samples": len(batch.samples), "ingested_volumes": len(batch.volumes)}

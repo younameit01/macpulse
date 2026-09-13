@@ -24,7 +24,7 @@ PLIST_LABEL="com.macai.storage.agent"
 PLIST_FILE="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
 
 echo "=================================================="
-echo " MacAI Storage Observatory - Remote Agent Setup   "
+echo " MacPulse - Remote Agent Setup                    "
 echo "=================================================="
 echo "[*] Coordinator: $COORDINATOR_URL"
 echo "[*] Destination: $INSTALL_DIR"

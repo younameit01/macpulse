@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Reset script for MacAI Storage Observatory.
+Reset script for MacPulse.
 Removes only application/demo-generated data and temporary files.
 """
 
@@ -13,7 +13,7 @@ project_root = Path(__file__).resolve().parent.parent
 db_path = project_root / "macai_observatory.db"
 
 def reset():
-    print("[*] Resetting MacAI Storage Observatory demo state...")
+    print("[*] Resetting MacPulse demo state...")
 
     # 1. Clean demo folder
     if DEMO_DIR.exists():

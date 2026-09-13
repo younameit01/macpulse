@@ -28,6 +28,8 @@ class Host(Base):
     agent_version = Column(String(64), nullable=False, default="1.0.0")
     last_seen = Column(DateTime, default=utc_now, nullable=False)
     status = Column(String(32), default="online", nullable=False)  # "online" | "offline"
+    disk_health_json = Column(Text, nullable=True)
+    system_resources_json = Column(Text, nullable=True)
 
     volumes = relationship("Volume", back_populates="host", cascade="all, delete-orphan")
     metric_samples = relationship("MetricSample", back_populates="host", cascade="all, delete-orphan")
@@ -99,9 +101,15 @@ class Alert(Base):
     volume_id = Column(String(255), nullable=True, index=True)
     type = Column(String(64), nullable=False)  # capacity_warning, capacity_critical, abnormal_write, agent_offline, nfs_concern
     severity = Column(String(32), nullable=False)  # warning | critical
-    status = Column(String(32), default="open", nullable=False)  # open | closed
+    status = Column(String(32), default="open", nullable=False)  # open | acknowledged | closed
     opened_at = Column(DateTime, default=utc_now, nullable=False, index=True)
     closed_at = Column(DateTime, nullable=True)
+    acknowledged_at = Column(DateTime, nullable=True)
+    acknowledged_by = Column(String(255), nullable=True)
+    resolved_by = Column(String(255), nullable=True)
+    resolution_note = Column(Text, nullable=True)
+    occurrence_count = Column(Integer, default=1, nullable=False)
+    last_seen_at = Column(DateTime, default=utc_now, nullable=False, index=True)
     evidence_json = Column(Text, nullable=False)
 
     host = relationship("Host", back_populates="alerts")
@@ -120,3 +128,18 @@ class Explanation(Base):
     status = Column(String(32), default="success", nullable=False)  # success | fallback | failed
 
     alert = relationship("Alert", back_populates="explanations")
+
+
+class AdminUser(Base):
+    __tablename__ = "admin_users"
+
+    id = Column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    role = Column(String(64), default="Admin", nullable=False)
+    auth0_user_id = Column(String(255), nullable=True)
+    setup_link = Column(String(512), nullable=True)
+    invite_token = Column(String(255), nullable=True, index=True)
+    created_by = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+

@@ -8,10 +8,23 @@ from typing import List
 from backend.database import get_db
 from backend.models import Volume, MetricSample, Alert, utc_now
 from backend.schemas import VolumeDetailResponse, AlertSummary, MetricPoint
+from backend.alert_utils import deduplicate_alerts
 
 router = APIRouter(prefix="/api/v1/volumes", tags=["volumes"])
 
-@router.get("/{volume_id}", response_model=VolumeDetailResponse)
+@router.get("/detail", response_model=VolumeDetailResponse)
+def get_volume_detail_query(volume_id: str = Query(...), db: Session = Depends(get_db)):
+    return get_volume_detail(volume_id=volume_id, db=db)
+
+@router.get("/detail/metrics", response_model=List[MetricPoint])
+def get_volume_metrics_query(
+    volume_id: str = Query(...),
+    minutes: int = Query(15, ge=1, le=1440),
+    db: Session = Depends(get_db),
+):
+    return get_volume_metrics(volume_id=volume_id, minutes=minutes, db=db)
+
+@router.get("/{volume_id:path}", response_model=VolumeDetailResponse)
 def get_volume_detail(volume_id: str, db: Session = Depends(get_db)):
     vol = db.query(Volume).filter(Volume.id == volume_id).first()
     if not vol:
@@ -35,30 +48,8 @@ def get_volume_detail(volume_id: str, db: Session = Depends(get_db)):
         }
 
     # Volume alerts
-    alerts_query = db.query(Alert).filter(Alert.volume_id == vol.id).order_by(desc(Alert.opened_at)).limit(10).all()
-    alert_summaries = []
-    for a in alerts_query:
-        evidence = {}
-        try:
-            evidence = json.loads(a.evidence_json)
-        except Exception:
-            evidence = {}
-        alert_summaries.append(
-            AlertSummary(
-                id=a.id,
-                host_id=a.host_id,
-                hostname=vol.host.hostname if vol.host else a.host_id,
-                volume_id=a.volume_id,
-                volume_mount=vol.mount_path,
-                type=a.type,
-                severity=a.severity,
-                status=a.status,
-                opened_at=a.opened_at,
-                closed_at=a.closed_at,
-                message=evidence.get("message", f"{a.type} alert"),
-                evidence=evidence,
-            )
-        )
+    alerts_query = db.query(Alert).filter(Alert.volume_id == vol.id).order_by(desc(Alert.last_seen_at), desc(Alert.opened_at)).limit(30).all()
+    alert_summaries = deduplicate_alerts(alerts_query)
 
     return VolumeDetailResponse(
         id=vol.id,

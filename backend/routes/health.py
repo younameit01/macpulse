@@ -18,5 +18,5 @@ def health_check(db: Session = Depends(get_db)):
         "status": "healthy" if db_status == "ok" else "degraded",
         "timestamp": utc_now().isoformat(),
         "database": db_status,
-        "service": "macai-storage-observatory-coordinator"
+        "service": "macpulse-coordinator"
     }

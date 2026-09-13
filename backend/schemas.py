@@ -41,6 +41,8 @@ class MetricsIngestBatch(BaseModel):
     timestamp: Optional[datetime] = None
     volumes: List[VolumeDiscoveryItem] = []
     samples: List[MetricSampleItem] = []
+    disk_health: Optional[Dict[str, Any]] = None
+    system_resources: Optional[Dict[str, Any]] = None
 
 class ProcessEventItem(BaseModel):
     process: str
@@ -80,8 +82,17 @@ class HostSummary(BaseModel):
     current_write_bps: float = 0.0
     current_read_bps: float = 0.0
     hottest_volume: Optional[str] = None
+    hottest_volume_metric: Optional[str] = None
     capacity_warning: bool = False
     latest_alert: Optional[str] = None
+    disk_health: Optional[Dict[str, Any]] = None
+    system_resources: Optional[Dict[str, Any]] = None
+
+class AlertHistoryEvent(BaseModel):
+    event: str
+    timestamp: datetime
+    actor: Optional[str] = None
+    note: Optional[str] = None
 
 class AlertSummary(BaseModel):
     id: str
@@ -94,8 +105,86 @@ class AlertSummary(BaseModel):
     status: str
     opened_at: datetime
     closed_at: Optional[datetime] = None
+    acknowledged_at: Optional[datetime] = None
+    acknowledged_by: Optional[str] = None
+    resolved_by: Optional[str] = None
+    resolution_note: Optional[str] = None
+    occurrence_count: int = 1
+    last_seen_at: Optional[datetime] = None
     message: str
     evidence: Dict[str, Any]
+    history: List[AlertHistoryEvent] = []
+
+class AcknowledgeAlertRequest(BaseModel):
+    note: Optional[str] = None
+
+class ResolveAlertRequest(BaseModel):
+    resolution_note: str
+
+class CreateAdminRequest(BaseModel):
+    name: str
+    email: str
+    password: Optional[str] = None
+
+class CreateAdminResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    role: str = "Admin"
+    setup_link: str
+    temp_password: Optional[str] = None
+    created_at: datetime
+
+class InviteInfoResponse(BaseModel):
+    valid: bool
+    name: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+    invited_by: Optional[str] = None
+    error: Optional[str] = None
+
+class AcceptInviteRequest(BaseModel):
+    invite_token: str
+    password: str
+
+class UserMeResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str  # "Super Admin" | "Admin"
+    picture: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+    name: Optional[str] = None
+
+
+class AuthTokenResponse(BaseModel):
+    access_token: str
+    id_token: Optional[str] = None
+    token_type: str = "Bearer"
+    expires_in: Optional[int] = None
+    user: UserMeResponse
+
+
+class ActiveVolumeItem(BaseModel):
+    id: str
+    mount_path: str
+    fs_type: str
+    host_id: str
+    hostname: str
+    total_bytes: int = 0
+    used_bytes: int = 0
+    used_pct: float = 0.0
+    is_warning: bool = False
+    warning_label: Optional[str] = None
 
 class OverviewResponse(BaseModel):
     hosts_online: int
@@ -107,6 +196,12 @@ class OverviewResponse(BaseModel):
     aggregate_read_bps: float
     hosts: List[HostSummary]
     recent_alerts: List[AlertSummary]
+    total_storage_bytes: Optional[int] = 0
+    used_storage_bytes: Optional[int] = 0
+    storage_used_pct: Optional[float] = 0.0
+    apfs_volume_count: Optional[int] = 0
+    nfs_volume_count: Optional[int] = 0
+    active_volumes: Optional[List[ActiveVolumeItem]] = []
 
 class MetricPoint(BaseModel):
     timestamp: datetime
@@ -125,6 +220,8 @@ class HostDetailResponse(BaseModel):
     volumes: List[VolumeSummary]
     recent_alerts: List[AlertSummary]
     recent_events: List[Dict[str, Any]]
+    disk_health: Optional[Dict[str, Any]] = None
+    system_resources: Optional[Dict[str, Any]] = None
 
 class VolumeDetailResponse(BaseModel):
     id: str

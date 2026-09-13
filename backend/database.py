@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
 from backend.config import MACAI_DB_PATH
 from backend.models import Base
@@ -29,6 +29,49 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE alerts ADD COLUMN occurrence_count INTEGER DEFAULT 1;"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE alerts ADD COLUMN last_seen_at DATETIME;"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE alerts ADD COLUMN acknowledged_at DATETIME;"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE alerts ADD COLUMN acknowledged_by VARCHAR(255);"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE alerts ADD COLUMN resolved_by VARCHAR(255);"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE alerts ADD COLUMN resolution_note TEXT;"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE hosts ADD COLUMN disk_health_json TEXT;"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE hosts ADD COLUMN system_resources_json TEXT;"))
+            conn.commit()
+        except Exception:
+            pass
+
+
 
 def get_db():
     db = SessionLocal()

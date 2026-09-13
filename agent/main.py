@@ -16,6 +16,8 @@ from agent.collectors.mounts import discover_mounts
 from agent.collectors.io_stats import IOSampler
 from agent.collectors.nfs_stats import collect_nfs_stats
 from agent.collectors.process_usage import collect_active_processes
+from agent.collectors.smart_stats import collect_disk_health
+from agent.collectors.system_stats import SystemStatsCollector
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,8 +40,8 @@ from agent.discovery import discover_coordinator_url
 
 def run_agent():
     metadata = get_host_metadata()
-    if MACAI_AGENT_NAME:
-        metadata["hostname"] = MACAI_AGENT_NAME
+    if MACAI_AGENT_NAME and MACAI_AGENT_NAME.strip():
+        metadata["hostname"] = MACAI_AGENT_NAME.strip()
 
     host_id = metadata["host_id"]
     logger.info(f"Starting MacAI Storage Agent for {metadata['hostname']} (ID: {host_id})")
@@ -51,6 +53,7 @@ def run_agent():
 
     client = CoordinatorClient(coordinator_url)
     io_sampler = IOSampler()
+    system_stats_collector = SystemStatsCollector()
 
     # Initial registration attempt
     client.register(metadata)
@@ -78,7 +81,13 @@ def run_agent():
             has_nfs = any(m.get("fs_type", "").lower() == "nfs" for m in mounts)
             nfs_info = collect_nfs_stats() if has_nfs else None
 
-            # 5. Build samples
+            # 5. Collect S.M.A.R.T. & hardware health metrics (every cycle or on interval)
+            disk_health = collect_disk_health()
+
+            # 6. Collect System Compute, GPU, Memory Pressure & Thermal metrics
+            system_resources = system_stats_collector.sample()
+
+            # 7. Build samples
             samples = []
             if mounts:
                 for m in mounts:
@@ -105,12 +114,20 @@ def run_agent():
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "volumes": mounts,
                 "samples": samples,
+                "disk_health": disk_health,
+                "system_resources": system_resources,
             }
 
             client.send_metrics(batch)
 
-            # 6. Sample process attribution if write rates are high or elevated mode active
-            if write_bps > 5 * 1024 * 1024 or MACAI_ENABLE_ELEVATED_COLLECTOR:
+            # 6. Sample process attribution: on abnormal write spikes, elevated mode, or periodically
+            should_sample_processes = (
+                write_bps > 5 * 1024 * 1024
+                or MACAI_ENABLE_ELEVATED_COLLECTOR
+                or iteration == 1
+                or iteration % 5 == 0
+            )
+            if should_sample_processes:
                 events = collect_active_processes(elevated=MACAI_ENABLE_ELEVATED_COLLECTOR)
                 if events:
                     client.send_events({
