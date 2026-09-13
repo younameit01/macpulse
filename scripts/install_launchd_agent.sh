@@ -54,6 +54,7 @@ cat <<EOF > "$PLIST_FILE"
     <dict>
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+$(if [ -n "$MACAI_COORDINATOR_URL" ]; then echo "        <key>MACAI_COORDINATOR_URL</key>\n        <string>$MACAI_COORDINATOR_URL</string>"; fi)
     </dict>
 </dict>
 </plist>
