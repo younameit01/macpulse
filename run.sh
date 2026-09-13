@@ -72,6 +72,18 @@ case "$1" in
     echo "[*] Generating simulated NFS/pNFS protocol workload..."
     "$PYTHON" "$DIR/scripts/demo_nfs_workload.py"
     ;;
+  demo-nfs-bg)
+    echo "[*] Starting simulated NFS workload in background..."
+    mkdir -p "$HOME/.macai"
+    nohup "$PYTHON" -u "$DIR/scripts/demo_nfs_workload.py" > "$HOME/.macai/nfs_demo.log" 2>&1 &
+    echo "[+] NFS workload running in background (PID: $!)."
+    echo "    • Live logs : tail -f ~/.macai/nfs_demo.log"
+    echo "    • Stop      : ./run.sh stop-nfs"
+    ;;
+  stop-nfs)
+    echo "[*] Stopping background NFS workload..."
+    pkill -f "scripts/demo_nfs_workload.py" 2>/dev/null && echo "[+] Stopped successfully." || echo "[!] NFS workload was not running."
+    ;;
   reset-demo)
     echo "[*] Resetting demo state..."
     "$PYTHON" "$DIR/scripts/demo_reset.py"

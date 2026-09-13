@@ -28,9 +28,9 @@ NFS_SOURCE = "10.161.3.95:/exports/pnfs_models"
 TOTAL_BYTES = 10 * 1024 * 1024 * 1024 * 1024  # 10 TB
 USED_BYTES = 6 * 1024 * 1024 * 1024 * 1024   # 6 TB (60% capacity)
 
-def run_nfs_demo():
+def run_nfs_demo(once: bool = False):
     print("=" * 70)
-    print("  MacPulse — Simulated NFS/pNFS Workload")
+    print("  MacPulse — Continuous Simulated NFS/pNFS Workload")
     print("=" * 70)
 
     # 1. Host identity and coordinator discovery
@@ -101,65 +101,68 @@ def run_nfs_demo():
         requests.post(f"{coordinator_url}/api/v1/ingest/events", json=payload, timeout=3)
 
     try:
-        # -------------------------------------------------------------
-        # Phase 1: Normal pNFS High-Throughput Dataset Streaming
-        # -------------------------------------------------------------
-        print("\n[Phase 1/3] Simulating healthy Parallel NFS dataset streaming (5 cycles)...")
-        print("    -> Check Dashboard: Watch for purple 'NFS' badge on the volume.")
-        for i in range(5):
-            send_metrics(
-                read_bps=75.0 * 1024 * 1024,   # 75 MB/s
-                write_bps=12.0 * 1024 * 1024,  # 12 MB/s
-                ops_per_sec=580.0,
-                retrans=0,
-                stage_name=f"HEALTHY {i+1}/5"
-            )
-            time.sleep(2)
+        cycle = 1
+        while True:
+            print(f"\n>>> [NFS Workload Cycle #{cycle}] Streaming real-time telemetry (Press Ctrl+C to stop)...")
 
-        # -------------------------------------------------------------
-        # Phase 2: Network Congestion & Retransmission Spike
-        # -------------------------------------------------------------
-        print("\n[Phase 2/3] Simulating Network Latency & RPC Retransmission Spike (5 cycles)...")
-        print("    -> Check Dashboard: Watch for 'nfs_retrans_high' alert in the alert bell / drawer!")
-        print("    -> You can click 'Explain with Gemini' on the alert to see root-cause diagnostics.")
-        
-        # Attribution for AI training checkpoint
-        send_process_event("python3", 84210, "younameit01", "write", 450 * 1024 * 1024)
+            # -------------------------------------------------------------
+            # Phase 1: Normal pNFS High-Throughput Dataset Streaming
+            # -------------------------------------------------------------
+            print("\n[Phase 1/3] Simulating healthy Parallel NFS dataset streaming (5 cycles)...")
+            print("    -> Check Dashboard: Watch for purple 'NFS' badge on the volume.")
+            for i in range(5):
+                send_metrics(
+                    read_bps=75.0 * 1024 * 1024,   # 75 MB/s
+                    write_bps=12.0 * 1024 * 1024,  # 12 MB/s
+                    ops_per_sec=580.0,
+                    retrans=0,
+                    stage_name=f"HEALTHY {i+1}/5"
+                )
+                time.sleep(2)
 
-        retrans_counts = [6, 11, 19, 22, 16]
-        for idx, r_count in enumerate(retrans_counts):
-            send_metrics(
-                read_bps=14.0 * 1024 * 1024,
-                write_bps=38.0 * 1024 * 1024,  # 38 MB/s checkpoint write
-                ops_per_sec=140.0,             # dropped throughput due to retries
-                retrans=r_count,
-                stage_name=f"CONGESTION {idx+1}/5"
-            )
-            time.sleep(2)
+            # -------------------------------------------------------------
+            # Phase 2: Network Congestion & Retransmission Spike
+            # -------------------------------------------------------------
+            print("\n[Phase 2/3] Simulating Network Latency & RPC Retransmission Spike (5 cycles)...")
+            print("    -> Check Dashboard: Watch for 'nfs_retrans_high' alert in the alert bell / drawer!")
+            print("    -> You can click 'Explain with Gemini' on the alert to see root-cause diagnostics.")
+            
+            # Attribution for AI training checkpoint
+            send_process_event("python3", 84210, "younameit01", "write", 450 * 1024 * 1024)
 
-        # -------------------------------------------------------------
-        # Phase 3: Recovery
-        # -------------------------------------------------------------
-        print("\n[Phase 3/3] Simulating Network Recovery (3 cycles)...")
-        print("    -> Check Dashboard: Retransmissions drop to 0, alert auto-resolves.")
-        for i in range(3):
-            send_metrics(
-                read_bps=50.0 * 1024 * 1024,
-                write_bps=8.0 * 1024 * 1024,
-                ops_per_sec=420.0,
-                retrans=0,
-                stage_name=f"RECOVERED {i+1}/3"
-            )
-            time.sleep(2)
+            retrans_counts = [6, 11, 19, 22, 16]
+            for idx, r_count in enumerate(retrans_counts):
+                send_metrics(
+                    read_bps=14.0 * 1024 * 1024,
+                    write_bps=38.0 * 1024 * 1024,  # 38 MB/s checkpoint write
+                    ops_per_sec=140.0,             # dropped throughput due to retries
+                    retrans=r_count,
+                    stage_name=f"CONGESTION {idx+1}/5"
+                )
+                time.sleep(2)
 
-        print("\n" + "=" * 70)
-        print("[+] NFS/pNFS Simulation Completed Successfully!")
-        print(f"[*] Open your browser to view the results:")
-        print(f"    - Coordinator Dashboard: http://localhost:8000")
-        print(f"    - On other laptop:        {coordinator_url}")
-        print(f"[*] Inspect Volume: Click on '{NFS_MOUNT_PATH}' to inspect RPC Ops and Retrans metrics.")
-        print(f"[*] Clean up demo data anytime: python scripts/demo_nfs_workload.py --clean")
-        print("=" * 70)
+            # -------------------------------------------------------------
+            # Phase 3: Recovery
+            # -------------------------------------------------------------
+            print("\n[Phase 3/3] Simulating Network Recovery (3 cycles)...")
+            print("    -> Check Dashboard: Retransmissions drop to 0, alert auto-resolves.")
+            for i in range(3):
+                send_metrics(
+                    read_bps=50.0 * 1024 * 1024,
+                    write_bps=8.0 * 1024 * 1024,
+                    ops_per_sec=420.0,
+                    retrans=0,
+                    stage_name=f"RECOVERED {i+1}/3"
+                )
+                time.sleep(2)
+
+            if once:
+                print("\n[+] Single simulation run completed.")
+                break
+
+            cycle += 1
+            print("\n[*] Cycle complete. Next cycle starting in 4 seconds...")
+            time.sleep(4)
 
     except KeyboardInterrupt:
         print("\n[!] Simulation halted by user.")
@@ -188,9 +191,10 @@ def clean_nfs_demo():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Simulate NFS / pNFS telemetry workload")
     parser.add_argument("--clean", action="store_true", help="Remove simulated NFS volume and alerts from the database")
+    parser.add_argument("--once", action="store_true", help="Run a single cycle and exit (default: continuous loop)")
     args = parser.parse_args()
 
     if args.clean:
         clean_nfs_demo()
     else:
-        run_nfs_demo()
+        run_nfs_demo(once=args.once)

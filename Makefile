@@ -4,7 +4,7 @@
 # ==============================================================================
 
 .PHONY: help setup server frontend agent agent-elevated install-agent uninstall-agent \
-        test demo-load demo-nfs reset-demo build clean clean-cache status lint
+        test demo-load demo-nfs demo-nfs-bg stop-nfs reset-demo build clean clean-cache status lint
 
 VENV         ?= .venv
 PYTHON       := $(VENV)/bin/python
@@ -136,6 +136,16 @@ demo-load:
 demo-nfs:
 	@echo "[*] Generating simulated Parallel NFS (pNFS) distributed workload..."
 	@$(PYTHON) scripts/demo_nfs_workload.py
+
+demo-nfs-bg:
+	@echo "[*] Starting simulated NFS workload in background..."
+	@mkdir -p $$HOME/.macai
+	@nohup $(PYTHON) -u scripts/demo_nfs_workload.py > $$HOME/.macai/nfs_demo.log 2>&1 &
+	@echo "[+] NFS workload running in background (log: tail -f ~/.macai/nfs_demo.log, stop: make stop-nfs)"
+
+stop-nfs:
+	@echo "[*] Stopping background NFS workload..."
+	@pkill -f "scripts/demo_nfs_workload.py" 2>/dev/null && echo "[+] Stopped successfully." || echo "[!] NFS workload was not running."
 
 reset-demo:
 	@echo "[*] Resetting local demo files and simulated NFS state..."
