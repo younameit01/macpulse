@@ -117,6 +117,13 @@ def get_volume_metrics(
         MetricSample.timestamp >= cutoff,
     ).order_by(MetricSample.timestamp.asc()).all()
 
+    # Fallback to the latest available samples so the chart is never blank when idle
+    if not samples:
+        recent = db.query(MetricSample).filter(
+            MetricSample.volume_id == volume_id,
+        ).order_by(MetricSample.timestamp.desc()).limit(60).all()
+        samples = list(reversed(recent))
+
     return [
         MetricPoint(
             timestamp=s.timestamp,

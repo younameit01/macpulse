@@ -264,6 +264,13 @@ def get_host_metrics(
         MetricSample.timestamp >= cutoff,
     ).order_by(MetricSample.timestamp.asc()).all()
 
+    # Fallback to the latest available samples so host charts are never blank when idle
+    if not samples:
+        recent = db.query(MetricSample).filter(
+            MetricSample.host_id == host_id,
+        ).order_by(MetricSample.timestamp.desc()).limit(60).all()
+        samples = list(reversed(recent))
+
     return [
         MetricPoint(
             timestamp=s.timestamp,
